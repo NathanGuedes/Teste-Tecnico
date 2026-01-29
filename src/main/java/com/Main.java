@@ -7,14 +7,13 @@ import java.net.URISyntaxException;
 import java.util.*;
 
 public class Main {
-    public static void main(String[] args) throws URISyntaxException, IOException, InterruptedException {
+    public static void main(String[] args) throws IOException {
         String BASE_URI = "https://dadosabertos.ans.gov.br/FTP/PDA/demonstracoes_contabeis/";
 
         ApiClient client = new ApiClient();
-        List<String> years = client.getYears(BASE_URI);
 
-        List<String> lastQuarters = client.getFiles(BASE_URI, 3);
+        List<String> files = client.getFiles(BASE_URI, 3);
 
-        System.out.println(lastQuarters);
+        System.out.println(files);
     }
 }
