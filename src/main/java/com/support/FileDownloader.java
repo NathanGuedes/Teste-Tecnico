@@ -36,8 +36,6 @@ public class FileDownloader {
         return dir;
     }
 
-
-
     public void downloadFile() {
         Path folderPath = makeDir("compress");
 
@@ -82,28 +80,26 @@ public class FileDownloader {
     public void unzip(Path zipFile, String targetDirName) {
         Path targetDir = makeDir(targetDirName);
 
-        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipFile))) {
+        try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(zipFile))) {
 
             ZipEntry entry;
 
-            while ((entry = zis.getNextEntry()) != null) {
+            while ((entry = zip.getNextEntry()) != null) {
                 Path newPath = targetDir.resolve(entry.getName()).normalize();
 
                 if (entry.isDirectory()) {
                     Files.createDirectories(newPath);
                 } else {
                     Files.createDirectories(newPath.getParent());
-                    Files.copy(zis, newPath, StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(zip, newPath, StandardCopyOption.REPLACE_EXISTING);
                 }
 
-                zis.closeEntry();
+                zip.closeEntry();
             }
 
         } catch (IOException e) {
             throw new RuntimeException("Erro ao extrair: " + zipFile, e);
         }
     }
-
-
 }
 
