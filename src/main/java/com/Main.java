@@ -1,6 +1,6 @@
 package com;
 
-import com.client.QuarterlyReportScraper;
+import com.support.QuarterlyReportScraper;
 
 import java.io.IOException;
 import java.util.*;
