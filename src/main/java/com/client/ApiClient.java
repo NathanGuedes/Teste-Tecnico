@@ -11,6 +11,9 @@ import java.util.regex.Pattern;
 
 public class ApiClient {
 
+    private static final Pattern PATTERN_1 = Pattern.compile("(\\d)T\\d{4}\\.zip");
+    private static final Pattern PATTERN_2 = Pattern.compile("\\d{4}_(\\d)_trimestre\\.zip");
+
     public List<String> getYears(String url) throws IOException {
         Document doc = getHtml(url);
 
@@ -52,31 +55,23 @@ public class ApiClient {
 
         return zips;
     }
-    
-    public List<String> getFiles(String url, int limit) throws IOException {
-        int targetYear = getBiggestYear(getYears(url));
 
-        List<String> zips = getZips(url + targetYear);
+    public List<String> getFiles(String url, int limit) throws IOException {
+        List<String> years = getYears(url);
+        int targetYear = getBiggestYear(years);
 
         Map<Integer, String> quarters = new TreeMap<>(Collections.reverseOrder());
 
-        Pattern pattern1 = Pattern.compile("(\\d)T\\d{4}\\.zip");
-        Pattern pattern2 = Pattern.compile("\\d{4}_(\\d)_trimestre\\.zip");
-
-        for (String zip : zips) {
-            Matcher m1 = pattern1.matcher(zip);
-            Matcher m2 = pattern2.matcher(zip);
-
-            if (m1.matches()) {
-                int quarter = Integer.parseInt(m1.group(1));
-                quarters.put(quarter, targetYear + "/" + zip);
-                continue;
+        while (quarters.size() < limit) {
+            if (!years.contains(String.valueOf(targetYear))) {
+                break;
             }
 
-            if (m2.matches()) {
-                int quarter = Integer.parseInt(m2.group(1));
-                quarters.put(quarter, targetYear + "/" + zip);
-            }
+            List<String> zips = getZips(url + targetYear);
+
+            extractQuarters(zips, targetYear, quarters);
+
+            targetYear--;
         }
 
         return quarters.values()
@@ -84,6 +79,37 @@ public class ApiClient {
                 .limit(limit)
                 .toList();
     }
+
+    private void extractQuarters(
+            List<String> zips,
+            int year,
+            Map<Integer, String> quarters
+    ) {
+        for (String zip : zips) {
+
+            Integer quarter = extractQuarter(zip);
+            if (quarter == null) {
+                continue;
+            }
+
+            quarters.putIfAbsent(quarter, year + "/" + zip);
+        }
+    }
+
+    private Integer extractQuarter(String zip) {
+        Matcher m1 = PATTERN_1.matcher(zip);
+        if (m1.matches()) {
+            return Integer.parseInt(m1.group(1));
+        }
+
+        Matcher m2 = PATTERN_2.matcher(zip);
+        if (m2.matches()) {
+            return Integer.parseInt(m2.group(1));
+        }
+
+        return null;
+    }
+
 
     private static Document getHtml(String url) throws IOException {
         return Jsoup.connect(url).get();
@@ -100,6 +126,5 @@ public class ApiClient {
         }
         return biggestYear;
     }
-
 
 }
