@@ -52,6 +52,8 @@ public class FileDownloader {
 
             Path destination = folderPath.resolve(fileName);
 
+            if (Files.exists(destination)) continue;
+
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(fullUrl))
                     .GET()
@@ -61,6 +63,7 @@ public class FileDownloader {
                     client.sendAsync(request, HttpResponse.BodyHandlers.ofFile(destination))
                             .thenAccept(response -> {
                                 if (response.statusCode() == 200) {
+                                    System.out.println("Download concluído: " + destination);
                                     unzip(destination, "extract");
                                 } else {
                                     System.out.println("Falha no download. Status: " + response.statusCode());
@@ -79,6 +82,8 @@ public class FileDownloader {
 
     public void unzip(Path zipFile, String targetDirName) {
         Path targetDir = makeDir(targetDirName);
+
+        System.out.println("Extraindo: " + zipFile.getFileName());
 
         try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(zipFile))) {
 
