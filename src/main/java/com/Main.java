@@ -15,6 +15,10 @@ public class Main {
 
         int biggestYear = getBiggestYear(years);
 
+        List<String> zips = client.getZips(BASE_URI + biggestYear);
+
+        System.out.println(zips);
+
     }
 
     private static int getBiggestYear(List<String> years) {
