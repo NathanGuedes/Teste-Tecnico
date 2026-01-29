@@ -14,12 +14,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-public class FileDownloader {
+public class ArchiveHandler {
 
     private final String baseUrl;
     private final List<String> urls;
 
-    public FileDownloader(String baseUrl, List<String> urls) {
+    public ArchiveHandler(String baseUrl, List<String> urls) {
         this.baseUrl = baseUrl;
         this.urls = urls;
     }
@@ -36,7 +36,7 @@ public class FileDownloader {
         return dir;
     }
 
-    public void downloadFile() {
+    public void ArchiveDownloader() {
         Path folderPath = makeDir("compress");
 
         HttpClient client = HttpClient.newHttpClient();
@@ -64,7 +64,7 @@ public class FileDownloader {
                             .thenAccept(response -> {
                                 if (response.statusCode() == 200) {
                                     System.out.println("Download concluído: " + destination);
-                                    unzip(destination, "extract");
+                                    ArchiveExtractor(destination, "extract");
                                 } else {
                                     System.out.println("Falha no download. Status: " + response.statusCode());
                                 }
@@ -80,7 +80,7 @@ public class FileDownloader {
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
     }
 
-    public void unzip(Path zipFile, String targetDirName) {
+    public void ArchiveExtractor(Path zipFile, String targetDirName) {
         Path targetDir = makeDir(targetDirName);
 
         System.out.println("Extraindo: " + zipFile.getFileName());
