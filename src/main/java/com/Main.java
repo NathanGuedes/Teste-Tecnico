@@ -4,7 +4,7 @@ import com.client.ApiClient;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.List;
+import java.util.*;
 
 public class Main {
     public static void main(String[] args) throws URISyntaxException, IOException, InterruptedException {
@@ -13,23 +13,8 @@ public class Main {
         ApiClient client = new ApiClient();
         List<String> years = client.getYears(BASE_URI);
 
-        int biggestYear = getBiggestYear(years);
+        List<String> lastQuarters = client.getFiles(BASE_URI, 3);
 
-        List<String> zips = client.getZips(BASE_URI + biggestYear);
-
-        System.out.println(zips);
-
-    }
-
-    private static int getBiggestYear(List<String> years) {
-        int biggestYear = Integer.parseInt(years.get(0));
-
-        for (String year : years) {
-            int value = Integer.parseInt(year);
-            if (value > biggestYear){
-                biggestYear = value;
-            }
-        }
-        return biggestYear;
+        System.out.println(lastQuarters);
     }
 }
