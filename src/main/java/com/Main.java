@@ -1,18 +1,17 @@
 package com;
 
-import com.client.ApiClient;
+import com.client.QuarterlyReportScraper;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.*;
 
 public class Main {
     public static void main(String[] args) throws IOException {
-        String BASE_URI = "https://dadosabertos.ans.gov.br/FTP/PDA/demonstracoes_contabeis/";
+        String BASE_URL = "https://dadosabertos.ans.gov.br/FTP/PDA/demonstracoes_contabeis/";
 
-        ApiClient client = new ApiClient();
+        QuarterlyReportScraper client = new QuarterlyReportScraper();
 
-        List<String> files = client.getFiles(BASE_URI, 3);
+        List<String> files = client.findRecentReportUrls(BASE_URL, 4);
 
         System.out.println(files);
     }
