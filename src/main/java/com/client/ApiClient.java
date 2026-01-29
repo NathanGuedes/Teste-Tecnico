@@ -13,7 +13,7 @@ public class ApiClient {
     public List<String> getYears(String url) throws IOException {
         Document doc = getHtml(url);
 
-        List<String> years = new ArrayList<String>();
+        List<String> years = new ArrayList<>();
 
         for (Element link : doc.select("a")) {
             String href = link.attr("href");
@@ -32,6 +32,24 @@ public class ApiClient {
         }
 
         return years;
+    }
+
+    public List<String> getZips(String url) throws IOException {
+        Document doc = getHtml(url);
+
+        List<String> zips = new ArrayList<>();
+
+        for (Element link : doc.select("a")) {
+            String href = link.attr("href");
+
+            if ("../".equals(href)) continue;
+
+            if (! href.contains(".zip")) continue;
+
+            zips.add(href);
+        }
+
+        return zips;
     }
 
     private static Document getHtml(String url) throws IOException {
