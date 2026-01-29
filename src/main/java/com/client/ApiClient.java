@@ -1,28 +1,42 @@
 package com.client;
 
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ApiClient {
 
-    private HttpClient client;
+    public List<String> getYears(String url) throws IOException {
+        Document doc = getHtml(url);
 
-    public ApiClient() {
-        this.client = HttpClient.newHttpClient();
+        List<String> years = new ArrayList<String>();
+
+        for (Element link : doc.select("a")) {
+            String href = link.attr("href");
+
+            if ("../".equals(href)) continue;
+
+            href = href.replace("/", "");
+
+            try {
+                Integer.parseInt(href);
+            } catch (NumberFormatException e) {
+                continue;
+            }
+
+            years.add(href);
+        }
+
+        return years;
     }
 
-    public String requestHtml(String url) throws URISyntaxException, IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(new URI(url))
-                .GET()
-                .build();
-
-        HttpResponse<String> httpResponse = this.client.send(request, HttpResponse.BodyHandlers.ofString());
-
-        return httpResponse.body();
+    private static Document getHtml(String url) throws IOException {
+        return Jsoup.connect(url).get();
     }
+
+
 }
