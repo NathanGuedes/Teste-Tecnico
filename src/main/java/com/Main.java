@@ -33,6 +33,6 @@ public class Main {
                     .toList();
         }
 
-        fileIOService.filterFile(files,"DESCRICAO" ,"Despesas com Eventos / Sinistros", ";");
+        fileIOService.filterFile(files,"DESCRICAO" ,"Despesas com Eventos/Sinistros");
     }
 }
