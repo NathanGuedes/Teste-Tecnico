@@ -11,9 +11,7 @@ import java.util.regex.Pattern;
 
 public class QuarterlyReportScraper {
 
-    // Exemplo: 1T2023.zip
     private static final Pattern PATTERN_1 = Pattern.compile("(\\d)T\\d{4}\\.zip");
-    // Exemplo: 2023_1_trimestre.zip
     private static final Pattern PATTERN_2 = Pattern.compile("\\d{4}_(\\d)_trimestre\\.zip");
 
     public List<String> findRecentReportUrls(String baseUrl, int limit) throws IOException {
