@@ -2,10 +2,12 @@ package com.support;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -14,12 +16,12 @@ import java.util.stream.Stream;
 public class FileIOService {
 
     public void filterFile(List<Path> files, String field, String filter, String separator) throws IOException {
-        Path baseDir = makeDir();
+        Path baseDir = makeDir("archives_data");
 
         String normalizedFilter = filter.replaceAll("\\s", "").toLowerCase();
 
         for (Path file : files) {
-            Path outputFile = getPath(file, baseDir);
+            Path outputFile = getPath(file, baseDir, "filtered_");
 
             try (Stream<String> lines = Files.lines(file, StandardCharsets.UTF_8);
                  BufferedWriter writer = Files.newBufferedWriter(outputFile, StandardCharsets.UTF_8)) {
@@ -67,15 +69,56 @@ public class FileIOService {
         }
     }
 
-    private static Path getPath(Path file, Path baseDir) {
-        return baseDir.resolve("filtered_" + file.getFileName());
+    private static Path getPath(Path file, Path baseDir, String prefix) {
+        return baseDir.resolve(prefix + file.getFileName());
     }
 
-    private static Path makeDir() throws IOException {
-        Path baseDir = Paths.get(System.getProperty("user.dir"), "archives_data");
+    private static Path makeDir(String folderName) throws IOException {
+        Path baseDir = Paths.get(System.getProperty("user.dir"), folderName);
         Files.createDirectories(baseDir);
         return baseDir;
     }
 
+    public void concatCsvFiles(List<Path> files) throws IOException {
+        Path baseDir = makeDir("concat_archive");
+        Path outputFile = baseDir.resolve("consolidated_quarters_by_description.csv");
+
+        boolean isFirstFile = true;
+
+        try (BufferedWriter writer = Files.newBufferedWriter(
+                outputFile,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING
+        )) {
+
+            for (Path file : files) {
+
+                try (Stream<String> lines = Files.lines(file, StandardCharsets.UTF_8)) {
+
+                    Iterator<String> it = lines.iterator();
+
+                    if (!it.hasNext()) continue;
+
+                    String header = it.next();
+
+                    if (isFirstFile) {
+                        writer.write(header);
+                        writer.newLine();
+                        isFirstFile = false;
+                    }
+
+                    it.forEachRemaining(line -> {
+                        try {
+                            writer.write(line);
+                            writer.newLine();
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    });
+                }
+            }
+        }
+    }
 
 }
