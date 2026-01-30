@@ -23,6 +23,14 @@ public class FileIOService {
         this.concatArchiveDir = makeDir("concat_archive");
     }
 
+    public Path getArchivesDir() {
+        return archivesDir;
+    }
+
+    public Path getConcatArchiveDir() {
+        return concatArchiveDir;
+    }
+
     public void filterFile(List<Path> files, String field, String filter, String separator) throws IOException {
 
         String normalizedFilter = filter.replaceAll("\\s", "").toLowerCase();
