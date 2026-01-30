@@ -1,5 +1,6 @@
 package com.support;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -8,12 +9,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Stream;
 
 public class FileIOService {
+
+    private final Path archivesDir;
+    private final Path concatArchiveDir;
+
+    public FileIOService() throws IOException {
+        this.archivesDir = makeDir("archives_data");
+        this.concatArchiveDir = makeDir("concat_archive");
+    }
 
     public void filterFile(List<Path> files, String field, String filter, String separator) throws IOException {
         Path baseDir = makeDir("archives_data");
