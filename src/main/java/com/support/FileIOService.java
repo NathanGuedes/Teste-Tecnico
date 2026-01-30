@@ -1,6 +1,5 @@
 package com.support;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -9,7 +8,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 import java.util.stream.Stream;
 
 public class FileIOService {
@@ -68,20 +69,11 @@ public class FileIOService {
         }
     }
 
-
-    private static Path getPath(Path file, Path baseDir, String prefix) {
-        return baseDir.resolve(prefix + file.getFileName());
-    }
-
-    private static Path makeDir(String folderName) throws IOException {
-        Path baseDir = Paths.get(System.getProperty("user.dir"), folderName);
-        Files.createDirectories(baseDir);
-        return baseDir;
-    }
-
     public void concatCsvFiles(List<Path> files) throws IOException {
-        Path baseDir = makeDir("concat_archive");
-        Path outputFile = baseDir.resolve("consolidated_quarters_by_description.csv");
+
+        Path outputFile = concatArchiveDir.resolve(
+                "consolidated_quarters_by_description.csv"
+        );
 
         boolean isFirstFile = true;
 
@@ -93,11 +85,9 @@ public class FileIOService {
         )) {
 
             for (Path file : files) {
-
                 try (Stream<String> lines = Files.lines(file, StandardCharsets.UTF_8)) {
 
                     Iterator<String> it = lines.iterator();
-
                     if (!it.hasNext()) continue;
 
                     String header = it.next();
@@ -119,6 +109,16 @@ public class FileIOService {
                 }
             }
         }
+
     }
 
+    private static Path getPath(Path file, Path baseDir, String prefix) {
+        return baseDir.resolve(prefix + file.getFileName());
+    }
+
+    private static Path makeDir(String folderName) throws IOException {
+        Path baseDir = Paths.get(System.getProperty("user.dir"), folderName);
+        Files.createDirectories(baseDir);
+        return baseDir;
+    }
 }
