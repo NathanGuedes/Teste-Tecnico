@@ -23,23 +23,17 @@ public class FileIOService {
     }
 
     public void filterFile(List<Path> files, String field, String filter, String separator) throws IOException {
-        Path baseDir = makeDir("archives_data");
 
         String normalizedFilter = filter.replaceAll("\\s", "").toLowerCase();
 
         for (Path file : files) {
-            Path outputFile = getPath(file, baseDir, "filtered_");
+            Path outputFile = getPath(file, archivesDir, "filtered_");
 
             try (Stream<String> lines = Files.lines(file, StandardCharsets.UTF_8);
                  BufferedWriter writer = Files.newBufferedWriter(outputFile, StandardCharsets.UTF_8)) {
 
-                System.out.println("Iniciando filtragem: " + file.getFileName());
-
                 Iterator<String> iterator = lines.iterator();
-
-                if (!iterator.hasNext()) {
-                    continue;
-                }
+                if (!iterator.hasNext()) continue;
 
                 String header = iterator.next();
                 List<String> columns = Arrays.stream(header.split(separator))
@@ -51,18 +45,16 @@ public class FileIOService {
                     throw new IllegalArgumentException("Campo '" + field + "' não encontrado");
                 }
 
-                // Escreve o cabeçalho
                 writer.write(header);
                 writer.newLine();
 
-                // Processa e filtra as linhas restantes
                 while (iterator.hasNext()) {
                     String line = iterator.next();
                     String[] values = line.split(separator);
 
                     if (fieldIndex < values.length) {
                         String value = values[fieldIndex]
-                                .replaceAll("\"", "")
+                                .replace("\"", "")
                                 .replaceAll("\\s", "")
                                 .toLowerCase();
 
@@ -75,6 +67,7 @@ public class FileIOService {
             }
         }
     }
+
 
     private static Path getPath(Path file, Path baseDir, String prefix) {
         return baseDir.resolve(prefix + file.getFileName());
