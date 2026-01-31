@@ -10,124 +10,111 @@ import org.jsoup.nodes.Element;
 
 public class QuarterlyReportUrlScraper {
 
-    private static final Pattern SHORT_NAME_PATTERN =
-            Pattern.compile("(\\d)T\\d{4}\\.zip");
+  private static final Pattern SHORT_NAME_PATTERN = Pattern.compile("(\\d)T\\d{4}\\.zip");
 
-    private static final Pattern LONG_NAME_PATTERN =
-            Pattern.compile("\\d{4}_(\\d)_trimestre\\.zip");
+  private static final Pattern LONG_NAME_PATTERN = Pattern.compile("\\d{4}_(\\d)_trimestre\\.zip");
 
-    public List<String> fetchLatestQuarterReportUrls(String baseUrl, int maxResults)
-            throws IOException {
+  public List<String> fetchLatestQuarterReportUrls(String baseUrl, int maxResults)
+      throws IOException {
 
-        List<String> availableYears = fetchAvailableYearsFromIndex(baseUrl);
-        int currentYear = findMostRecentYear(availableYears);
+    List<String> availableYears = fetchAvailableYearsFromIndex(baseUrl);
+    int currentYear = findMostRecentYear(availableYears);
 
-        Map<Integer, String> quarterToReportMap =
-                new TreeMap<>(Collections.reverseOrder());
+    Map<Integer, String> quarterToReportMap = new TreeMap<>(Collections.reverseOrder());
 
-        while (quarterToReportMap.size() < maxResults) {
+    while (quarterToReportMap.size() < maxResults) {
 
-            if (!availableYears.contains(String.valueOf(currentYear))) {
-                break;
-            }
+      if (!availableYears.contains(String.valueOf(currentYear))) {
+        break;
+      }
 
-            List<String> zipFiles =
-                    fetchZipFilesFromYearPage(baseUrl + currentYear);
+      List<String> zipFiles = fetchZipFilesFromYearPage(baseUrl + currentYear);
 
-            collectLatestQuarterReports(
-                    zipFiles, currentYear, quarterToReportMap);
+      collectLatestQuarterReports(zipFiles, currentYear, quarterToReportMap);
 
-            currentYear--;
-        }
-
-        return quarterToReportMap.values()
-                .stream()
-                .limit(maxResults)
-                .toList();
+      currentYear--;
     }
 
-    private List<String> fetchAvailableYearsFromIndex(String url)
-            throws IOException {
+    return quarterToReportMap.values().stream().limit(maxResults).toList();
+  }
 
-        Document doc = fetchDocument(url);
-        List<String> years = new ArrayList<>();
+  private List<String> fetchAvailableYearsFromIndex(String url) throws IOException {
 
-        for (Element link : doc.select("a")) {
-            String href = link.attr("href");
+    Document doc = fetchDocument(url);
+    List<String> years = new ArrayList<>();
 
-            if ("../".equals(href)) continue;
+    for (Element link : doc.select("a")) {
+      String href = link.attr("href");
 
-            href = href.replace("/", "");
+      if ("../".equals(href)) continue;
 
-            try {
-                Integer.parseInt(href);
-                years.add(href);
-            } catch (NumberFormatException ignored) {
-            }
-        }
-        return years;
+      href = href.replace("/", "");
+
+      try {
+        Integer.parseInt(href);
+        years.add(href);
+      } catch (NumberFormatException ignored) {
+      }
+    }
+    return years;
+  }
+
+  private List<String> fetchZipFilesFromYearPage(String url) throws IOException {
+
+    Document doc = fetchDocument(url);
+    List<String> zipFiles = new ArrayList<>();
+
+    for (Element link : doc.select("a")) {
+      String href = link.attr("href");
+
+      if ("../".equals(href)) continue;
+      if (!href.endsWith(".zip")) continue;
+
+      zipFiles.add(href);
+    }
+    return zipFiles;
+  }
+
+  private void collectLatestQuarterReports(
+      List<String> zipFilenames, int year, Map<Integer, String> quarterToReportMap) {
+
+    for (String filename : zipFilenames) {
+      Integer quarter = extractQuarterFromFilename(filename);
+
+      if (quarter == null) continue;
+
+      quarterToReportMap.putIfAbsent(quarter, year + "/" + filename);
+    }
+  }
+
+  private Integer extractQuarterFromFilename(String filename) {
+
+    Matcher shortMatcher = SHORT_NAME_PATTERN.matcher(filename);
+    if (shortMatcher.matches()) {
+      return Integer.parseInt(shortMatcher.group(1));
     }
 
-    private List<String> fetchZipFilesFromYearPage(String url)
-            throws IOException {
-
-        Document doc = fetchDocument(url);
-        List<String> zipFiles = new ArrayList<>();
-
-        for (Element link : doc.select("a")) {
-            String href = link.attr("href");
-
-            if ("../".equals(href)) continue;
-            if (!href.endsWith(".zip")) continue;
-
-            zipFiles.add(href);
-        }
-        return zipFiles;
+    Matcher longMatcher = LONG_NAME_PATTERN.matcher(filename);
+    if (longMatcher.matches()) {
+      return Integer.parseInt(longMatcher.group(1));
     }
 
-    private void collectLatestQuarterReports(
-            List<String> zipFilenames,
-            int year,
-            Map<Integer, String> quarterToReportMap) {
+    return null;
+  }
 
-        for (String filename : zipFilenames) {
-            Integer quarter = extractQuarterFromFilename(filename);
+  private static int findMostRecentYear(List<String> years) {
+    int mostRecent = Integer.parseInt(years.get(0));
 
-            if (quarter == null) continue;
-
-            quarterToReportMap.putIfAbsent(
-                    quarter, year + "/" + filename);
-        }
+    for (String year : years) {
+      int value = Integer.parseInt(year);
+      if (value > mostRecent) {
+        mostRecent = value;
+      }
     }
+    return mostRecent;
+  }
 
-    private Integer extractQuarterFromFilename(String filename) {
-
-        Matcher shortMatcher = SHORT_NAME_PATTERN.matcher(filename);
-        if (shortMatcher.matches()) {
-            return Integer.parseInt(shortMatcher.group(1));
-        }
-
-        Matcher longMatcher = LONG_NAME_PATTERN.matcher(filename);
-        if (longMatcher.matches()) {
-            return Integer.parseInt(longMatcher.group(1));
-        }
-
-        return null;
-    }
-
-    private static int findMostRecentYear(List<String> years) {
-        int mostRecent = Integer.parseInt(years.get(0));
-
-        for (String year : years) {
-            int value = Integer.parseInt(year);
-            if (value > mostRecent) {
-                mostRecent = value;
-            }
-        }
-        return mostRecent;
-    }
-
-    private static Document fetchDocument(String url) throws IOException {
-        return Jsoup.connect(url).get();
-    }
+  private static Document fetchDocument(String url) throws IOException {
+    return Jsoup.connect(url).get();
+  }
 }
