@@ -14,42 +14,40 @@ import java.util.concurrent.CompletableFuture;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-public class ArchiveHandler {
+public class ZipArchiveService {
 
   private final String baseUrl;
-  private final List<String> urls;
+  private final List<String> archivePaths;
 
-  public ArchiveHandler(String baseUrl, List<String> urls) {
+  public ZipArchiveService(String baseUrl, List<String> archivePaths) {
     this.baseUrl = baseUrl;
-    this.urls = urls;
+    this.archivePaths = archivePaths;
   }
 
-  private Path makeDir(String path) {
-    Path dir = Path.of(System.getProperty("user.dir"), path);
+  private Path createDirectory(String directoryName) {
+    Path dir = Path.of(System.getProperty("user.dir"), directoryName);
 
     try {
       Files.createDirectories(dir);
     } catch (IOException e) {
-      throw new RuntimeException("Erro ao criar diretório", e);
+      throw new RuntimeException("Erro ao criar diretório: " + directoryName, e);
     }
 
     return dir;
   }
 
-  public void ArchiveDownloader() {
-    Path folderPath = makeDir("compress");
+  public void downloadAndExtractArchives() {
+    Path downloadDir = createDirectory("compress");
+    Path extractDir = createDirectory("extract");
 
     HttpClient client = HttpClient.newHttpClient();
-
     List<CompletableFuture<Void>> futures = new ArrayList<>();
 
-    for (String url : urls) {
-      String fullUrl = baseUrl + url;
-
+    for (String archivePath : archivePaths) {
+      String fullUrl = baseUrl + archivePath;
       String fileName = Path.of(URI.create(fullUrl).getPath()).getFileName().toString();
 
-      Path destination = folderPath.resolve(fileName);
-
+      Path destination = downloadDir.resolve(fileName);
       if (Files.exists(destination)) continue;
 
       HttpRequest request = HttpRequest.newBuilder().uri(URI.create(fullUrl)).GET().build();
@@ -61,7 +59,7 @@ public class ArchiveHandler {
                   response -> {
                     if (response.statusCode() == 200) {
                       System.out.println("Download concluído: " + destination);
-                      ArchiveExtractor(destination, "extract");
+                      extractZip(destination, extractDir);
                     } else {
                       System.out.println("Falha no download. Status: " + response.statusCode());
                     }
@@ -78,13 +76,10 @@ public class ArchiveHandler {
     CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
   }
 
-  public void ArchiveExtractor(Path zipFile, String targetDirName) {
-    Path targetDir = makeDir(targetDirName);
-
+  private void extractZip(Path zipFile, Path targetDir) {
     System.out.println("Extraindo: " + zipFile.getFileName());
 
     try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(zipFile))) {
-
       ZipEntry entry;
 
       while ((entry = zip.getNextEntry()) != null) {
@@ -101,7 +96,7 @@ public class ArchiveHandler {
       }
 
     } catch (IOException e) {
-      throw new RuntimeException("Erro ao extrair: " + zipFile, e);
+      throw new RuntimeException("Erro ao extrair arquivo: " + zipFile, e);
     }
   }
 }
