@@ -28,34 +28,29 @@ public class CsvFileProcessor {
   }
 
   public void filterCsvFilesByColumnValue(
-          List<Path> inputFiles,
-          String columnName,
-          String expectedValue,
-          String delimiter)
-          throws IOException {
+      List<Path> inputFiles, String columnName, String expectedValue, String delimiter)
+      throws IOException {
 
-    String normalizedExpectedValue =
-            expectedValue.replaceAll("\\s", "").toLowerCase();
+    String normalizedExpectedValue = expectedValue.replaceAll("\\s", "").toLowerCase();
 
     for (Path inputFile : inputFiles) {
       Path outputFile = resolveFilteredOutputPath(inputFile);
 
       try (Stream<String> lines = Files.lines(inputFile, StandardCharsets.UTF_8);
-           BufferedWriter writer = Files.newBufferedWriter(outputFile, StandardCharsets.UTF_8)) {
+          BufferedWriter writer = Files.newBufferedWriter(outputFile, StandardCharsets.UTF_8)) {
 
         Iterator<String> iterator = lines.iterator();
         if (!iterator.hasNext()) continue;
 
         String header = iterator.next();
         List<String> columns =
-                Arrays.stream(header.split(delimiter))
-                        .map(col -> col.replace("\"", "").trim())
-                        .toList();
+            Arrays.stream(header.split(delimiter))
+                .map(col -> col.replace("\"", "").trim())
+                .toList();
 
         int columnIndex = columns.indexOf(columnName);
         if (columnIndex == -1) {
-          throw new IllegalArgumentException(
-                  "Coluna '" + columnName + "' não encontrada");
+          throw new IllegalArgumentException("Coluna '" + columnName + "' não encontrada");
         }
 
         writer.write(header);
@@ -67,10 +62,7 @@ public class CsvFileProcessor {
 
           if (columnIndex < values.length) {
             String value =
-                    values[columnIndex]
-                            .replace("\"", "")
-                            .replaceAll("\\s", "")
-                            .toLowerCase();
+                values[columnIndex].replace("\"", "").replaceAll("\\s", "").toLowerCase();
 
             if (value.equals(normalizedExpectedValue)) {
               writer.write(line);
@@ -84,17 +76,16 @@ public class CsvFileProcessor {
 
   public void mergeCsvFiles(List<Path> files) throws IOException {
 
-    Path outputFile =
-            preProcessedOutputDir.resolve("consolidated_quarters_by_description.csv");
+    Path outputFile = preProcessedOutputDir.resolve("consolidated_quarters_by_description.csv");
 
     boolean writeHeader = true;
 
     try (BufferedWriter writer =
-                 Files.newBufferedWriter(
-                         outputFile,
-                         StandardCharsets.UTF_8,
-                         StandardOpenOption.CREATE,
-                         StandardOpenOption.TRUNCATE_EXISTING)) {
+        Files.newBufferedWriter(
+            outputFile,
+            StandardCharsets.UTF_8,
+            StandardOpenOption.CREATE,
+            StandardOpenOption.TRUNCATE_EXISTING)) {
 
       for (Path file : files) {
         try (Stream<String> lines = Files.lines(file, StandardCharsets.UTF_8)) {
@@ -111,35 +102,32 @@ public class CsvFileProcessor {
           }
 
           it.forEachRemaining(
-                  line -> {
-                    try {
-                      writer.write(line);
-                      writer.newLine();
-                    } catch (IOException e) {
-                      throw new UncheckedIOException(e);
-                    }
-                  });
+              line -> {
+                try {
+                  writer.write(line);
+                  writer.newLine();
+                } catch (IOException e) {
+                  throw new UncheckedIOException(e);
+                }
+              });
         }
       }
     }
   }
 
-  public void removeDuplicateLines(Path inputFile, boolean keepFirstOccurrence)
-          throws IOException {
+  public void removeDuplicateLines(Path inputFile, boolean keepFirstOccurrence) throws IOException {
 
-    Path outputFile =
-            preProcessedOutputDir.resolve("unique_" + inputFile.getFileName());
+    Path outputFile = preProcessedOutputDir.resolve("unique_" + inputFile.getFileName());
 
     Set<String> uniqueLines = new LinkedHashSet<>();
 
-    try (BufferedReader reader =
-                 Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
-         BufferedWriter writer =
-                 Files.newBufferedWriter(
-                         outputFile,
-                         StandardCharsets.UTF_8,
-                         StandardOpenOption.CREATE,
-                         StandardOpenOption.TRUNCATE_EXISTING)) {
+    try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
+        BufferedWriter writer =
+            Files.newBufferedWriter(
+                outputFile,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING)) {
 
       String line;
       boolean isHeader = true;
