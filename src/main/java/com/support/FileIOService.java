@@ -14,20 +14,20 @@ import java.util.stream.Stream;
 
 public class FileIOService {
 
-  private final Path archivesDir;
-  private final Path concatArchiveDir;
+  private final Path filteredDir;
+  private final Path preProcessedFiles;
 
   public FileIOService() throws IOException {
-    this.archivesDir = makeDir("archives_data");
-    this.concatArchiveDir = makeDir("concat_archive");
+    this.filteredDir = makeDir("filtered_files");
+    this.preProcessedFiles = makeDir("pre_processed_files");
   }
 
-  public Path getArchivesDir() {
-    return archivesDir;
+  public Path getFilteredDir() {
+    return filteredDir;
   }
 
-  public Path getConcatArchiveDir() {
-    return concatArchiveDir;
+  public Path getPreProcessedFiles() {
+    return preProcessedFiles;
   }
 
   public void filterFile(List<Path> files, String field, String filter, String separator)
@@ -36,7 +36,7 @@ public class FileIOService {
     String normalizedFilter = filter.replaceAll("\\s", "").toLowerCase();
 
     for (Path file : files) {
-      Path outputFile = getPath(file, archivesDir);
+      Path outputFile = getPath(file, filteredDir);
 
       try (Stream<String> lines = Files.lines(file, StandardCharsets.UTF_8);
           BufferedWriter writer = Files.newBufferedWriter(outputFile, StandardCharsets.UTF_8)) {
@@ -77,7 +77,7 @@ public class FileIOService {
 
   public void concatCsvFiles(List<Path> files) throws IOException {
 
-    Path outputFile = concatArchiveDir.resolve("consolidated_quarters_by_description.csv");
+    Path outputFile = preProcessedFiles.resolve("consolidated_quarters_by_description.csv");
 
     boolean isFirstFile = true;
 
@@ -118,7 +118,7 @@ public class FileIOService {
 
   public void removeDuplicates(Path inputFile, boolean maintainFirstOccurrence) throws IOException {
 
-    Path outputFile = concatArchiveDir.resolve("consolidated_quarters_by_description_unique.csv");
+    Path outputFile = preProcessedFiles.resolve("unique_" + inputFile.getFileName());
 
     Set<String> processedLines = new LinkedHashSet<>();
 
