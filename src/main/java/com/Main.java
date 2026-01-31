@@ -1,7 +1,7 @@
 package com;
 
-import com.support.FileIOService;
-import com.support.QuarterlyReportScraper;
+import com.support.CsvFileProcessor;
+import com.support.QuarterlyReportUrlScraper;
 import com.support.ZipArchiveService;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -11,46 +11,68 @@ import java.util.List;
 import java.util.stream.Stream;
 
 public class Main {
+
   public static void main(String[] args) throws IOException {
 
-    String BASE_URL = "https://dadosabertos.ans.gov.br/FTP/PDA/demonstracoes_contabeis/";
+    // URL base onde estão os diretórios anuais dos relatórios
+    ZipArchiveService zipService = getZipArchiveService();
+    zipService.downloadAndExtractArchives();
 
-    QuarterlyReportScraper client = new QuarterlyReportScraper();
-    List<String> links = client.findRecentReportUrls(BASE_URL, 3);
+    // Serviço responsável por filtrar, juntar e deduplicar arquivos CSV
+    CsvFileProcessor csvProcessor = new CsvFileProcessor();
 
-    ZipArchiveService fileDownloader = new ZipArchiveService(BASE_URL, links);
-    fileDownloader.downloadAndExtractArchives();
-
-    FileIOService fileIOService = new FileIOService();
-
+    // Diretório onde os arquivos ZIP foram extraídos
     Path extractDir = Path.of(System.getProperty("user.dir"), "extract");
 
+    // Lista todos os arquivos extraídos
     List<Path> extractedFiles;
     try (Stream<Path> paths = Files.list(extractDir)) {
       extractedFiles = paths.filter(Files::isRegularFile).toList();
     }
 
-    fileIOService.filterFile(extractedFiles, "DESCRICAO", "Despesas com Eventos/Sinistros", ";");
+    // Filtra os CSVs pela coluna DESCRICAO com o valor desejado
+    csvProcessor.filterCsvFilesByColumnValue(
+        extractedFiles, "DESCRICAO", "Despesas com Eventos/Sinistros", ";");
 
-    Path archivesDir = fileIOService.getFilteredDir();
+    // Diretório onde ficaram os arquivos filtrados
+    Path filteredDir = csvProcessor.getFilteredOutputDir();
 
-    List<Path> filesToConcat;
-    try (Stream<Path> paths = Files.list(archivesDir)) {
-      filesToConcat = paths.filter(Files::isRegularFile).toList();
+    // Lista os arquivos filtrados para concatenação
+    List<Path> filteredFiles;
+    try (Stream<Path> paths = Files.list(filteredDir)) {
+      filteredFiles = paths.filter(Files::isRegularFile).toList();
     }
 
-    fileIOService.concatCsvFiles(filesToConcat);
+    // Concatena os CSVs filtrados em um único arquivo
+    csvProcessor.mergeCsvFiles(filteredFiles);
 
-    Path archivesConcatDir = fileIOService.getPreProcessedFiles();
+    // Diretório onde o CSV consolidado foi salvo
+    Path preProcessedDir = csvProcessor.getPreProcessedOutputDir();
 
-    Path concatFile = archivesConcatDir.resolve("consolidated_quarters_by_description.csv");
+    // Arquivo final consolidado dos trimestres
+    Path consolidatedFile = preProcessedDir.resolve("consolidated_quarters_by_description.csv");
 
-    fileIOService.removeDuplicates(concatFile, true);
+    // Remove linhas duplicadas mantendo a primeira ocorrência
+    csvProcessor.removeDuplicateLines(consolidatedFile, true);
 
-    Path extraFiles = Paths.get(System.getProperty("user.dir"), "extra_files");
+    // Diretório extra com dados externos (ex: operadoras)
+    Path extraFilesDir = Paths.get(System.getProperty("user.dir"), "extra_files");
 
-    Path filesToUnique = extraFiles.resolve("dados operadoras.csv");
+    // Arquivo externo que também precisa ser deduplicado
+    Path operatorsFile = extraFilesDir.resolve("dados operadoras.csv");
 
-    fileIOService.removeDuplicates(filesToUnique, true);
+    // Remove duplicatas do arquivo de operadoras
+    csvProcessor.removeDuplicateLines(operatorsFile, true);
+  }
+
+  private static ZipArchiveService getZipArchiveService() throws IOException {
+    String BASE_URL = "https://dadosabertos.ans.gov.br/FTP/PDA/demonstracoes_contabeis/";
+
+    // Descobre os N relatórios trimestrais mais recentes disponíveis no site
+    QuarterlyReportUrlScraper scraper = new QuarterlyReportUrlScraper();
+    List<String> recentReportLinks = scraper.fetchLatestQuarterReportUrls(BASE_URL, 3);
+
+    // Faz o download dos ZIPs encontrados e extrai os arquivos localmente
+    return new ZipArchiveService(BASE_URL, recentReportLinks);
   }
 }

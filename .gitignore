@@ -40,6 +40,6 @@ build/
 
 compress
 extract
-extraFiles
+filtered_files
 pre_processed_files
 .idea
