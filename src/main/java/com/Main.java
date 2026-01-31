@@ -1,8 +1,8 @@
 package com;
 
-import com.support.ArchiveHandler;
 import com.support.FileIOService;
 import com.support.QuarterlyReportScraper;
+import com.support.ZipArchiveService;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,8 +18,8 @@ public class Main {
     QuarterlyReportScraper client = new QuarterlyReportScraper();
     List<String> links = client.findRecentReportUrls(BASE_URL, 3);
 
-    ArchiveHandler fileDownloader = new ArchiveHandler(BASE_URL, links);
-    fileDownloader.ArchiveDownloader();
+    ZipArchiveService fileDownloader = new ZipArchiveService(BASE_URL, links);
+    fileDownloader.downloadAndExtractArchives();
 
     FileIOService fileIOService = new FileIOService();
 
@@ -47,7 +47,7 @@ public class Main {
 
     fileIOService.removeDuplicates(concatFile, true);
 
-    Path extraFiles = Paths.get(System.getProperty("user.dir"), "extraFiles");
+    Path extraFiles = Paths.get(System.getProperty("user.dir"), "extra_files");
 
     Path filesToUnique = extraFiles.resolve("dados operadoras.csv");
 
