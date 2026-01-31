@@ -1,5 +1,6 @@
 package com.support;
 
+import com.support.enums.MathOperation;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -53,7 +54,8 @@ public class CsvDataTransformationService {
     }
   }
 
-  public Path validateColumnByRegex(Path inputFile, String columnName, String regex, String delimiter) throws IOException {
+  public void validateColumnByRegex(
+      Path inputFile, String columnName, String regex, String delimiter) throws IOException {
 
     // Lê o índice do cabeçalho (nome da coluna -> posição)
     Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
@@ -106,8 +108,92 @@ public class CsvDataTransformationService {
         writer.newLine();
       }
     }
+  }
 
-    return outputFile;
+  public void calculateNewColumn(
+      Path inputFile,
+      String column1,
+      String column2,
+      String newColumnName,
+      MathOperation operation,
+      String delimiter)
+      throws IOException {
+
+    // Diretório de saída
+    Path calculatedDir = createDirectory("calculated_files");
+
+    // Lê o índice do cabeçalho
+    Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
+
+    Integer index1 = headerIndex.get(column1);
+    Integer index2 = headerIndex.get(column2);
+
+    if (index1 == null || index2 == null) {
+      throw new IllegalArgumentException("Colunas informadas não existem no CSV");
+    }
+
+    // Arquivo de saída
+    Path outputFile = calculatedDir.resolve("calculated_" + inputFile.getFileName());
+
+    try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
+        BufferedWriter writer =
+            Files.newBufferedWriter(
+                outputFile,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING)) {
+
+      // Cabeçalho original
+      String headerLine = reader.readLine();
+
+      // Escreve cabeçalho com nova coluna
+      writer.write(headerLine + delimiter + '"' + newColumnName + '"');
+      writer.newLine();
+
+      String line;
+
+      // Processa linhas
+      while ((line = reader.readLine()) != null) {
+
+        if (line.trim().isEmpty()) continue;
+
+        String[] values = line.split(delimiter, -1);
+
+        double value1 = parseNumber(values, index1);
+        double value2 = parseNumber(values, index2);
+
+        double result = applyOperation(value1, value2, operation);
+
+        // Escreve linha original + resultado
+        writer.write(line + delimiter + result);
+        writer.newLine();
+      }
+    }
+
+  }
+
+  private double parseNumber(String[] values, int index) {
+    if (index >= values.length) return 0.0;
+
+    String raw = values[index].replace("\"", "").replace(",", ".").trim();
+
+    if (raw.isEmpty()) return 0.0;
+
+    try {
+      return Double.parseDouble(raw);
+    } catch (NumberFormatException e) {
+      return 0.0;
+    }
+  }
+
+  private double applyOperation(double v1, double v2, MathOperation operation) {
+
+    return switch (operation) {
+      case ADD -> v1 + v2;
+      case SUBTRACT -> v1 - v2;
+      case MULTIPLY -> v1 * v2;
+      case DIVIDE -> v2 == 0 ? 0.0 : v1 / v2;
+    };
   }
 
   private static Path createDirectory(String folderName) throws IOException {
