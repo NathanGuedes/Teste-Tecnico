@@ -6,6 +6,7 @@ import com.support.QuarterlyReportScraper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -31,7 +32,7 @@ public class Main {
 
     fileIOService.filterFile(extractedFiles, "DESCRICAO", "Despesas com Eventos/Sinistros", ";");
 
-    Path archivesDir = fileIOService.getArchivesDir();
+    Path archivesDir = fileIOService.getFilteredDir();
 
     List<Path> filesToConcat;
     try (Stream<Path> paths = Files.list(archivesDir)) {
@@ -40,10 +41,16 @@ public class Main {
 
     fileIOService.concatCsvFiles(filesToConcat);
 
-    Path archivesConcatDir = fileIOService.getConcatArchiveDir();
+    Path archivesConcatDir = fileIOService.getPreProcessedFiles();
 
     Path concatFile = archivesConcatDir.resolve("consolidated_quarters_by_description.csv");
 
     fileIOService.removeDuplicates(concatFile, true);
+
+    Path extraFiles = Paths.get(System.getProperty("user.dir"), "extraFiles");
+
+    Path filesToUnique = extraFiles.resolve("dados operadoras.csv");
+
+    fileIOService.removeDuplicates(filesToUnique, true);
   }
 }
