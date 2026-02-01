@@ -9,7 +9,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.text.NumberFormat;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -164,8 +166,10 @@ public class CsvDataTransformationService {
 
         double result = applyOperation(value1, value2, operation);
 
+        String resultFormatado = String.format("%.2f", result);
+
         // Escreve linha original + resultado
-        writer.write(line + delimiter + result);
+        writer.write(line + delimiter + '"' + (delimiter.equals(";") ? resultFormatado.replace(".", ",") : resultFormatado) + '"');
         writer.newLine();
       }
     }
