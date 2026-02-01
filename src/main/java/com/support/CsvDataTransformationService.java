@@ -15,8 +15,13 @@ import java.util.stream.Stream;
 
 public class CsvDataTransformationService {
 
+  // Diretório onde serão salvos os arquivos com validação por regex
   private final Path validatedFilesDir;
+
+  // Diretório onde serão salvos os arquivos mesclados
   private final Path mergedFilesDir;
+
+  // Diretório onde serão salvos os arquivos com colunas calculadas
   private final Path calculetedFilesDir;
 
   public CsvDataTransformationService() throws IOException {
@@ -37,6 +42,7 @@ public class CsvDataTransformationService {
     return calculetedFilesDir;
   }
 
+  // Lê o cabeçalho do CSV e retorna um mapa com o nome da coluna e seu índice
   private static Map<String, Integer> readCsvHeaderIndex(Path csvFile, String delimiter)
       throws IOException {
 
@@ -51,7 +57,6 @@ public class CsvDataTransformationService {
 
       for (int i = 0; i < columns.length; i++) {
         String column = columns[i].replace("\"", "").trim();
-
         headerIndex.put(column, i);
       }
 
@@ -59,22 +64,23 @@ public class CsvDataTransformationService {
     }
   }
 
+  // Valida uma coluna usando regex e adiciona uma coluna indicando se o valor é válido
   public void validateColumnByRegex(
       Path inputFile, String columnName, String regex, String delimiter) throws IOException {
 
-    // Lê o índice do cabeçalho (nome da coluna -> posição)
+    // Obtém o índice das colunas do CSV
     Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
 
-    // Valida se a coluna existe
+    // Verifica se a coluna existe
     Integer columnIndex = headerIndex.get(columnName);
     if (columnIndex == null) {
       throw new IllegalArgumentException("Coluna '" + columnName + "' não encontrada no CSV");
     }
 
-    // Prepara regex
+    // Compila o regex informado
     Pattern pattern = Pattern.compile(regex);
 
-    // Arquivo de saída
+    // Define o arquivo de saída com prefixo validated_
     Path outputFile = validatedFilesDir.resolve("validated_" + inputFile.getFileName());
 
     try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
@@ -88,13 +94,13 @@ public class CsvDataTransformationService {
       // Lê o cabeçalho original
       String headerLine = reader.readLine();
 
-      // Escreve cabeçalho + nova coluna
+      // Escreve o cabeçalho original adicionando a nova coluna de validação
       writer.write(headerLine + delimiter + "valid_" + columnName);
       writer.newLine();
 
       String line;
 
-      // Processa as linhas do arquivo
+      // Processa cada linha do arquivo
       while ((line = reader.readLine()) != null) {
 
         if (line.trim().isEmpty()) continue;
@@ -103,18 +109,19 @@ public class CsvDataTransformationService {
 
         String valueToValidate = columnIndex < values.length ? values[columnIndex] : "";
 
-        // Remove aspas e espaços antes da validação
+        // Normaliza o valor antes da validação
         valueToValidate = valueToValidate.replace("\"", "").trim();
 
         boolean matches = pattern.matcher(valueToValidate).matches();
 
-        // Escreve linha original + flag de validação
+        // Escreve a linha original adicionando 1 ou 0 conforme o resultado do regex
         writer.write(line + delimiter + (matches ? "1" : "0"));
         writer.newLine();
       }
     }
   }
 
+  // Cria uma nova coluna calculada a partir de duas colunas existentes
   public void calculateNewColumn(
       Path inputFile,
       String column1,
@@ -124,7 +131,7 @@ public class CsvDataTransformationService {
       String delimiter)
       throws IOException {
 
-    // Lê o índice do cabeçalho
+    // Obtém o índice das colunas do CSV
     Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
 
     Integer index1 = headerIndex.get(column1);
@@ -134,7 +141,7 @@ public class CsvDataTransformationService {
       throw new IllegalArgumentException("Colunas informadas não existem no CSV");
     }
 
-    // Arquivo de saída
+    // Define o arquivo de saída com prefixo calculated_
     Path outputFile = calculetedFilesDir.resolve("calculated_" + inputFile.getFileName());
 
     try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
@@ -145,16 +152,16 @@ public class CsvDataTransformationService {
                 StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING)) {
 
-      // Cabeçalho original
+      // Lê o cabeçalho original
       String headerLine = reader.readLine();
 
-      // Escreve cabeçalho com nova coluna
+      // Escreve o cabeçalho adicionando a nova coluna calculada
       writer.write(headerLine + delimiter + '"' + newColumnName + '"');
       writer.newLine();
 
       String line;
 
-      // Processa linhas
+      // Processa cada linha do arquivo
       while ((line = reader.readLine()) != null) {
 
         if (line.trim().isEmpty()) continue;
@@ -168,7 +175,7 @@ public class CsvDataTransformationService {
 
         String resultFormatado = String.format("%.2f", result);
 
-        // Escreve linha original + resultado
+        // Escreve a linha original adicionando o resultado da operação
         writer.write(
             line
                 + delimiter
@@ -180,15 +187,12 @@ public class CsvDataTransformationService {
     }
   }
 
+  // Mescla dois arquivos CSV utilizando uma chave comum
   public void mergeCsvByKey(
-      Path leftFile,
-      Path rightFile,
-      String leftKeyColumn,
-      String rightKeyColumn,
-      String delimiter)
+      Path leftFile, Path rightFile, String leftKeyColumn, String rightKeyColumn, String delimiter)
       throws IOException {
 
-    // ===== 1. Lê e indexa o arquivo da direita (B) =====
+    // Indexa o arquivo da direita usando a chave informada
     Map<String, String[]> rightFileIndex = new HashMap<>();
 
     List<String> rightHeaders;
@@ -219,9 +223,9 @@ public class CsvDataTransformationService {
       }
     }
 
-    Path outputFile = mergedFilesDir.resolve("merged_" + leftFile.getFileName() + "_" + rightFile.getFileName());
+    Path outputFile =
+        mergedFilesDir.resolve("merged_" + leftFile.getFileName() + "_" + rightFile.getFileName());
 
-    // ===== 2. Prepara leitura do arquivo da esquerda (A) =====
     try (BufferedReader leftReader = Files.newBufferedReader(leftFile, StandardCharsets.UTF_8);
         BufferedWriter writer =
             Files.newBufferedWriter(
@@ -246,7 +250,7 @@ public class CsvDataTransformationService {
             "Chave '" + leftKeyColumn + "' não encontrada no arquivo da esquerda");
       }
 
-      // ===== 3. Escreve cabeçalho final =====
+      // Escreve o cabeçalho final com colunas dos dois arquivos
       List<String> finalHeader = new ArrayList<>();
       finalHeader.addAll(leftHeaders);
       finalHeader.addAll(rightHeaders);
@@ -255,7 +259,7 @@ public class CsvDataTransformationService {
       writer.write(String.join(delimiter, finalHeader));
       writer.newLine();
 
-      // ===== 4. Processa linha a linha do arquivo da esquerda =====
+      // Processa cada linha do arquivo da esquerda
       String leftLine;
       while ((leftLine = leftReader.readLine()) != null) {
 
@@ -264,15 +268,12 @@ public class CsvDataTransformationService {
 
         String[] rightValues = rightFileIndex.get(leftKeyValue);
 
-        // adiciona colunas do arquivo da esquerda
         List<String> mergedLine = new ArrayList<>(Arrays.asList(leftValues));
 
         if (rightValues != null) {
-          // chave encontrada → adiciona colunas do arquivo da direita
           mergedLine.addAll(Arrays.asList(rightValues));
           mergedLine.add("");
         } else {
-          // chave não encontrada → completa com null
           for (int i = 0; i < rightHeaders.size(); i++) {
             mergedLine.add("null");
           }
@@ -285,6 +286,7 @@ public class CsvDataTransformationService {
     }
   }
 
+  // Converte um valor do CSV para double de forma segura
   private double parseNumber(String[] values, int index) {
     if (index >= values.length) return 0.0;
 
@@ -299,8 +301,8 @@ public class CsvDataTransformationService {
     }
   }
 
+  // Aplica a operação matemática informada
   private double applyOperation(double v1, double v2, MathOperation operation) {
-
     return switch (operation) {
       case ADD -> v1 + v2;
       case SUBTRACT -> v1 - v2;
@@ -309,6 +311,7 @@ public class CsvDataTransformationService {
     };
   }
 
+  // Cria um diretório na raiz do projeto caso não exista
   private static Path createDirectory(String folderName) throws IOException {
     Path baseDir = Paths.get(System.getProperty("user.dir"), folderName);
     Files.createDirectories(baseDir);
