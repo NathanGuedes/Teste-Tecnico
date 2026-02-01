@@ -9,10 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.text.NumberFormat;
-import java.util.LinkedHashMap;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -20,10 +17,12 @@ public class CsvDataTransformationService {
 
   private final Path validatedFilesDir;
   private final Path mergedFilesDir;
+  private final Path calculetedFilesDir;
 
   public CsvDataTransformationService() throws IOException {
     this.validatedFilesDir = createDirectory("validated_files");
     this.mergedFilesDir = createDirectory("merged_files");
+    this.calculetedFilesDir = createDirectory("calculated_files");
   }
 
   public Path getValidatedFilesDir() {
@@ -32,6 +31,10 @@ public class CsvDataTransformationService {
 
   public Path getMergedFilesDir() {
     return mergedFilesDir;
+  }
+
+  public Path getCalculetedFilesDir() {
+    return calculetedFilesDir;
   }
 
   private static Map<String, Integer> readCsvHeaderIndex(Path csvFile, String delimiter)
@@ -121,9 +124,6 @@ public class CsvDataTransformationService {
       String delimiter)
       throws IOException {
 
-    // Diretório de saída
-    Path calculatedDir = createDirectory("calculated_files");
-
     // Lê o índice do cabeçalho
     Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
 
@@ -135,7 +135,7 @@ public class CsvDataTransformationService {
     }
 
     // Arquivo de saída
-    Path outputFile = calculatedDir.resolve("calculated_" + inputFile.getFileName());
+    Path outputFile = calculetedFilesDir.resolve("calculated_" + inputFile.getFileName());
 
     try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
         BufferedWriter writer =
@@ -169,11 +169,120 @@ public class CsvDataTransformationService {
         String resultFormatado = String.format("%.2f", result);
 
         // Escreve linha original + resultado
-        writer.write(line + delimiter + '"' + (delimiter.equals(";") ? resultFormatado.replace(".", ",") : resultFormatado) + '"');
+        writer.write(
+            line
+                + delimiter
+                + '"'
+                + (delimiter.equals(";") ? resultFormatado.replace(".", ",") : resultFormatado)
+                + '"');
         writer.newLine();
       }
     }
+  }
 
+  public void mergeCsvByKey(
+      Path leftFile,
+      Path rightFile,
+      String leftKeyColumn,
+      String rightKeyColumn,
+      String delimiter)
+      throws IOException {
+
+    // ===== 1. Lê e indexa o arquivo da direita (B) =====
+    Map<String, String[]> rightFileIndex = new HashMap<>();
+
+    List<String> rightHeaders;
+    int rightKeyIndex;
+
+    try (BufferedReader reader = Files.newBufferedReader(rightFile, StandardCharsets.UTF_8)) {
+
+      String headerLine = reader.readLine();
+      if (headerLine == null) {
+        throw new IllegalArgumentException("Arquivo da direita está vazio");
+      }
+
+      rightHeaders =
+          Arrays.stream(headerLine.split(delimiter)).map(h -> h.replace("\"", "").trim()).toList();
+
+      rightKeyIndex = rightHeaders.indexOf(rightKeyColumn);
+      if (rightKeyIndex == -1) {
+        throw new IllegalArgumentException(
+            "Chave '" + rightKeyColumn + "' não encontrada no arquivo da direita");
+      }
+
+      String line;
+      while ((line = reader.readLine()) != null) {
+        String[] values = line.split(delimiter, -1);
+        if (rightKeyIndex < values.length) {
+          rightFileIndex.put(values[rightKeyIndex], values);
+        }
+      }
+    }
+
+    Path outputFile = mergedFilesDir.resolve("merged_" + leftFile.getFileName() + "_" + rightFile.getFileName());
+
+    // ===== 2. Prepara leitura do arquivo da esquerda (A) =====
+    try (BufferedReader leftReader = Files.newBufferedReader(leftFile, StandardCharsets.UTF_8);
+        BufferedWriter writer =
+            Files.newBufferedWriter(
+                outputFile,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING)) {
+
+      String leftHeaderLine = leftReader.readLine();
+      if (leftHeaderLine == null) {
+        throw new IllegalArgumentException("Arquivo da esquerda está vazio");
+      }
+
+      List<String> leftHeaders =
+          Arrays.stream(leftHeaderLine.split(delimiter))
+              .map(h -> h.replace("\"", "").trim())
+              .toList();
+
+      int leftKeyIndex = leftHeaders.indexOf(leftKeyColumn);
+      if (leftKeyIndex == -1) {
+        throw new IllegalArgumentException(
+            "Chave '" + leftKeyColumn + "' não encontrada no arquivo da esquerda");
+      }
+
+      // ===== 3. Escreve cabeçalho final =====
+      List<String> finalHeader = new ArrayList<>();
+      finalHeader.addAll(leftHeaders);
+      finalHeader.addAll(rightHeaders);
+      finalHeader.add("OBSERVACAO");
+
+      writer.write(String.join(delimiter, finalHeader));
+      writer.newLine();
+
+      // ===== 4. Processa linha a linha do arquivo da esquerda =====
+      String leftLine;
+      while ((leftLine = leftReader.readLine()) != null) {
+
+        String[] leftValues = leftLine.split(delimiter, -1);
+        String leftKeyValue = leftKeyIndex < leftValues.length ? leftValues[leftKeyIndex] : null;
+
+        String[] rightValues = rightFileIndex.get(leftKeyValue);
+
+        // adiciona colunas do arquivo da esquerda
+        List<String> mergedLine = new ArrayList<>(Arrays.asList(leftValues));
+
+        if (rightValues != null) {
+          // chave encontrada → adiciona colunas do arquivo da direita
+          mergedLine.addAll(Arrays.asList(rightValues));
+          mergedLine.add("");
+        } else {
+          // chave não encontrada → completa com null
+          for (int i = 0; i < rightHeaders.size(); i++) {
+            mergedLine.add("null");
+          }
+          mergedLine.add("DADOS_NAO_ENCONTRADOS");
+        }
+
+        writer.write(String.join(delimiter, mergedLine));
+        writer.newLine();
+      }
+    }
   }
 
   private double parseNumber(String[] values, int index) {
