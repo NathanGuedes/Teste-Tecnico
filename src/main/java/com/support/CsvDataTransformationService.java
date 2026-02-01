@@ -95,7 +95,7 @@ public class CsvDataTransformationService {
       String headerLine = reader.readLine();
 
       // Escreve o cabeçalho original adicionando a nova coluna de validação
-      writer.write(headerLine + delimiter + "valid_" + columnName);
+      writer.write((headerLine + delimiter + columnName + "_VALIDO").toUpperCase());
       writer.newLine();
 
       String line;
@@ -156,7 +156,7 @@ public class CsvDataTransformationService {
       String headerLine = reader.readLine();
 
       // Escreve o cabeçalho adicionando a nova coluna calculada
-      writer.write(headerLine + delimiter + '"' + newColumnName + '"');
+      writer.write((headerLine + delimiter  + newColumnName).toUpperCase());
       writer.newLine();
 
       String line;
@@ -284,6 +284,63 @@ public class CsvDataTransformationService {
         writer.newLine();
       }
     }
+  }
+
+  public void extractColumns(Path inputFile, List<String> columnsToKeep, String delimiter)
+      throws IOException {
+
+    // Lê o índice do cabeçalho
+    Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
+
+    // Valida se todas as colunas existem
+    for (String column : columnsToKeep) {
+      if (!headerIndex.containsKey(column)) {
+        throw new IllegalArgumentException("Coluna '" + column + "' não encontrada no CSV");
+      }
+    }
+
+    // Diretório de saída
+    Path outputDir = Paths.get(System.getProperty("user.dir"), "projected_files");
+    Files.createDirectories(outputDir);
+
+    // Arquivo de saída
+    Path outputFile = outputDir.resolve("projected_" + inputFile.getFileName());
+
+    // Índices das colunas que serão extraídas
+    List<Integer> columnIndexes = columnsToKeep.stream().map(headerIndex::get).toList();
+
+    try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
+        BufferedWriter writer =
+            Files.newBufferedWriter(
+                outputFile,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING)) {
+
+      // Escreve o novo cabeçalho
+      writer.write(String.join(delimiter, columnsToKeep));
+      writer.newLine();
+
+      String line;
+
+      // Processa as linhas do CSV
+      while ((line = reader.readLine()) != null) {
+
+        if (line.trim().isEmpty()) continue;
+
+        String[] values = line.split(delimiter, -1);
+
+        List<String> projectedValues = new ArrayList<>();
+
+        for (int index : columnIndexes) {
+          projectedValues.add(index < values.length ? values[index] : "");
+        }
+
+        writer.write(String.join(delimiter, projectedValues));
+        writer.newLine();
+      }
+    }
+
   }
 
   // Converte um valor do CSV para double de forma segura
