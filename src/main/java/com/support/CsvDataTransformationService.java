@@ -81,7 +81,7 @@ public class CsvDataTransformationService {
     Pattern pattern = Pattern.compile(regex);
 
     // Define o arquivo de saída com prefixo validated_
-    Path outputFile = validatedFilesDir.resolve("validated_" + inputFile.getFileName());
+    Path outputFile = validatedFilesDir.resolve(inputFile.getFileName());
 
     try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
         BufferedWriter writer =
@@ -142,7 +142,7 @@ public class CsvDataTransformationService {
     }
 
     // Define o arquivo de saída com prefixo calculated_
-    Path outputFile = calculetedFilesDir.resolve("calculated_" + inputFile.getFileName());
+    Path outputFile = calculetedFilesDir.resolve(inputFile.getFileName());
 
     try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
         BufferedWriter writer =
@@ -156,7 +156,7 @@ public class CsvDataTransformationService {
       String headerLine = reader.readLine();
 
       // Escreve o cabeçalho adicionando a nova coluna calculada
-      writer.write((headerLine + delimiter  + newColumnName).toUpperCase());
+      writer.write((headerLine + delimiter + newColumnName).toUpperCase());
       writer.newLine();
 
       String line;
@@ -223,8 +223,10 @@ public class CsvDataTransformationService {
       }
     }
 
-    Path outputFile =
-        mergedFilesDir.resolve("merged_" + leftFile.getFileName() + "_" + rightFile.getFileName());
+    String leftName = leftFile.getFileName().toString().replaceFirst("\\.csv$", "");
+    String rightName = rightFile.getFileName().toString().replaceFirst("\\.csv$", "");
+
+    Path outputFile = mergedFilesDir.resolve(leftName + "_" + rightName + ".csv");
 
     try (BufferedReader leftReader = Files.newBufferedReader(leftFile, StandardCharsets.UTF_8);
         BufferedWriter writer =
@@ -287,7 +289,7 @@ public class CsvDataTransformationService {
   }
 
   public void extractColumns(Path inputFile, List<String> columnsToKeep, String delimiter)
-      throws IOException {
+          throws IOException {
 
     // Lê o índice do cabeçalho
     Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
@@ -303,27 +305,31 @@ public class CsvDataTransformationService {
     Path outputDir = Paths.get(System.getProperty("user.dir"), "projected_files");
     Files.createDirectories(outputDir);
 
-    // Arquivo de saída
-    Path outputFile = outputDir.resolve("projected_" + inputFile.getFileName());
+    // Arquivo de saída (mesmo nome do original)
+    Path outputFile = outputDir.resolve(inputFile.getFileName());
 
     // Índices das colunas que serão extraídas
-    List<Integer> columnIndexes = columnsToKeep.stream().map(headerIndex::get).toList();
+    List<Integer> columnIndexes =
+            columnsToKeep.stream().map(headerIndex::get).toList();
 
     try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
-        BufferedWriter writer =
-            Files.newBufferedWriter(
-                outputFile,
-                StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING)) {
+         BufferedWriter writer =
+                 Files.newBufferedWriter(
+                         outputFile,
+                         StandardCharsets.UTF_8,
+                         StandardOpenOption.CREATE,
+                         StandardOpenOption.TRUNCATE_EXISTING)) {
 
       // Escreve o novo cabeçalho
       writer.write(String.join(delimiter, columnsToKeep));
       writer.newLine();
 
+      // DESCARTA o cabeçalho original do CSV
+      reader.readLine();
+
       String line;
 
-      // Processa as linhas do CSV
+      // Processa apenas as linhas de dados
       while ((line = reader.readLine()) != null) {
 
         if (line.trim().isEmpty()) continue;
@@ -340,8 +346,8 @@ public class CsvDataTransformationService {
         writer.newLine();
       }
     }
-
   }
+
 
   // Converte um valor do CSV para double de forma segura
   private double parseNumber(String[] values, int index) {
