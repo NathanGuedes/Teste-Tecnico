@@ -94,7 +94,7 @@ public class CsvFileProcessor {
   public void mergeCsvFiles(List<Path> files) throws IOException {
 
     // Define o arquivo de saída consolidado
-    Path outputFile = preProcessedOutputDir.resolve("consolidated_quarters_by_description.csv");
+    Path outputFile = preProcessedOutputDir.resolve("quarters_by_description.csv");
 
     boolean writeHeader = true;
 
@@ -186,7 +186,7 @@ public class CsvFileProcessor {
 
   // Resolve o caminho do arquivo filtrado com base no arquivo de entrada
   private Path resolveFilteredOutputPath(Path inputFile) {
-    return filteredOutputDir.resolve("filtered_" + inputFile.getFileName());
+    return filteredOutputDir.resolve(inputFile.getFileName());
   }
 
   // Cria um diretório na raiz do projeto caso não exista
