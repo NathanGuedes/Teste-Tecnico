@@ -1,8 +1,10 @@
 package com;
 
+import com.support.CsvDataTransformationService;
 import com.support.CsvFileProcessor;
 import com.support.QuarterlyReportUrlScraper;
 import com.support.ZipArchiveService;
+import com.support.enums.MathOperation;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -63,6 +65,33 @@ public class Main {
 
     // Remove duplicatas do arquivo de operadoras
     csvProcessor.removeDuplicateLines(operatorsFile, true);
+
+    CsvDataTransformationService csvService = new CsvDataTransformationService();
+
+    Path csvToValidator = preProcessedDir.resolve("unique_dados operadoras.csv");
+
+    csvService.validateColumnByRegex(
+        csvToValidator, "CNPJ", "^\\d{2}\\.?\\d{3}\\.?\\d{3}\\/?\\d{4}-?\\d{2}$", ";");
+
+    Path csvToCalculate =
+        preProcessedDir.resolve("unique_consolidated_quarters_by_description.csv");
+
+    csvService.calculateNewColumn(
+        csvToCalculate,
+        "VL_SALDO_FINAL",
+        "VL_SALDO_INICIAL",
+        "ValorDespesas",
+        MathOperation.SUBTRACT,
+        ";");
+
+
+    Path calculated_dir = csvService.getCalculetedFilesDir();
+    Path validated_dir = csvService.getValidatedFilesDir();
+
+    Path leftFile = calculated_dir.resolve("calculated_unique_consolidated_quarters_by_description.csv");
+    Path rigthFile = validated_dir.resolve("validated_unique_dados operadoras.csv");
+
+    csvService.mergeCsvByKey(leftFile, rigthFile, "REG_ANS", "REGISTRO_OPERADORA", ";");
   }
 
   private static ZipArchiveService getZipArchiveService() throws IOException {
