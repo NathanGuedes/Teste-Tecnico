@@ -204,6 +204,69 @@ public class CsvTransformer {
     this.file = outputFile;
   }
 
+  private String formatCsvField(String field) {
+    if (field == null) return "";
+
+    field = field.trim();
+
+    // Se já estiver entre aspas, assume formatado
+    if (field.startsWith("\"") && field.endsWith("\"")) {
+      return field;
+    }
+
+    boolean containsDelimiter = field.contains(delimiter);
+    boolean containsQuote = field.contains("\"");
+    boolean containsLineBreak = field.contains("\n") || field.contains("\r");
+
+    boolean isNumber;
+    try {
+      Double.parseDouble(field.replace(",", "."));
+      isNumber = true;
+    } catch (NumberFormatException e) {
+      isNumber = false;
+    }
+
+    if (!isNumber || containsDelimiter || containsQuote || containsLineBreak) {
+      String escaped = field.replace("\"", "\"\"");
+      return "\"" + escaped + "\"";
+    }
+
+    return field;
+  }
+
+  /**
+   * Salva o CSV formatado corretamente em diretório /output
+   */
+  public void saveFormatted(String fileName) throws IOException {
+
+    Path outputDir = Path.of("output");
+    Files.createDirectories(outputDir);
+
+    Path outputFile = outputDir.resolve(fileName);
+
+    try (BufferedWriter writer =
+                 Files.newBufferedWriter(
+                         outputFile,
+                         StandardCharsets.UTF_8,
+                         StandardOpenOption.CREATE,
+                         StandardOpenOption.TRUNCATE_EXISTING)) {
+
+      for (String[] row : rows) {
+        String line =
+                Arrays.stream(row)
+                        .map(this::formatCsvField)
+                        .reduce((a, b) -> a + delimiter + b)
+                        .orElse("");
+
+        writer.write(line);
+        writer.newLine();
+      }
+    }
+
+    System.out.println("CSV salvo em: " + outputFile.toAbsolutePath());
+  }
+
+
   /** Carrega CSV na memória */
   private void load() throws IOException {
     try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
