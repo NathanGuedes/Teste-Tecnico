@@ -70,8 +70,7 @@ public class CsvValidator {
     return this;
   }
 
-  /** Remove linhas onde o valor da coluna numérica é igual ao valor fornecido */
-  /** Remove linhas com base em uma operação numérica */
+    /** Remove linhas com base em uma operação numérica */
   public CsvValidator filterRowsByNumericValue(
       String column, double value, ComparisonOperators op) {
 
@@ -103,7 +102,6 @@ public class CsvValidator {
 
       } catch (NumberFormatException e) {
         // se não for número, mantém
-        keep = true;
       }
 
       if (keep) {
@@ -318,5 +316,65 @@ public class CsvValidator {
     }
 
     System.out.println("CSV salvo em: " + outputFile.toAbsolutePath());
+  }
+
+  /** Valida se um campo obrigatório está vazio. Marca observação e cria coluna <COLUNA>_VALIDO */
+  public CsvValidator validateRequiredField(String column) {
+
+    Map<String, Integer> index = headerIndex();
+    Integer colIndex = index.get(column.toUpperCase());
+
+    if (colIndex == null) {
+      throw new IllegalArgumentException("Coluna não encontrada: " + column);
+    }
+
+    String validColumn = column.toUpperCase() + "_VALIDO";
+    String obsColumn = "OBSERVACAO";
+
+    // === HEADER ===
+    List<String> header = new ArrayList<>(List.of(rows.get(0)));
+
+    if (!header.contains(validColumn)) {
+      header.add("\"" + validColumn + "\"");
+    }
+
+    if (!header.contains(obsColumn)) {
+      header.add("\"" + obsColumn + "\"");
+    }
+
+    rows.set(0, header.toArray(new String[0]));
+
+    // Atualiza índices após alterar header
+    index = headerIndex();
+    int validIdx = index.get(validColumn);
+    int obsIdx = index.get(obsColumn);
+
+    // === LINHAS ===
+    for (int i = 1; i < rows.size(); i++) {
+
+      String[] row = rows.get(i);
+      String value = clean(row[colIndex]);
+
+      boolean isValid = !value.isEmpty();
+
+      row = ensureSize(row, rows.get(0).length);
+
+      row[validIdx] = isValid ? "true" : "false";
+
+      if (!isValid) {
+        String obs = clean(row[obsIdx]);
+        String msg = "Campo " + column + " não preenchido";
+        row[obsIdx] = obs.isEmpty() ? msg : obs + " | " + msg;
+      }
+
+      rows.set(i, row);
+    }
+
+    return this;
+  }
+
+  private String[] ensureSize(String[] row, int size) {
+    if (row.length >= size) return row;
+    return Arrays.copyOf(row, size);
   }
 }
