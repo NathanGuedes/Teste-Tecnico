@@ -380,4 +380,72 @@ public class CsvDataTransformationService {
     Files.createDirectories(baseDir);
     return baseDir;
   }
+
+  public void addYearAndQuarterColumns(
+          Path inputFile,
+          String dateColumnName,
+          String delimiter
+  ) throws IOException {
+
+    Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
+
+    Integer dateIndex = headerIndex.get(dateColumnName);
+    if (dateIndex == null) {
+      throw new IllegalArgumentException(
+              "Coluna de data '" + dateColumnName + "' não encontrada no CSV");
+    }
+
+    Path outputFile = calculetedFilesDir.resolve("new_" + inputFile.getFileName());
+
+    try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
+         BufferedWriter writer = Files.newBufferedWriter(
+                 outputFile,
+                 StandardCharsets.UTF_8,
+                 StandardOpenOption.CREATE,
+                 StandardOpenOption.TRUNCATE_EXISTING)) {
+
+      // Cabeçalho original
+      String headerLine = reader.readLine();
+
+      // Novo cabeçalho
+      writer.write((headerLine + delimiter + "ANO" + delimiter + "TRIMESTRE").toUpperCase());
+      writer.newLine();
+
+      String line;
+
+      while ((line = reader.readLine()) != null) {
+
+        if (line.trim().isEmpty()) continue;
+
+        String[] values = line.split(delimiter, -1);
+
+        String rawDate = dateIndex < values.length
+                ? values[dateIndex].replace("\"", "").trim()
+                : "";
+
+        int year = 0;
+        int quarter = 0;
+
+        // Validação básica do formato yyyy-mm-dd
+        if (rawDate.matches("\\d{4}-\\d{2}-\\d{2}")) {
+
+          String[] dateParts = rawDate.split("-");
+
+          year = Integer.parseInt(dateParts[0]);
+          int month = Integer.parseInt(dateParts[1]);
+
+          quarter = ((month - 1) / 3) + 1;
+        }
+
+        writer.write(
+                line
+                        + delimiter
+                        + year
+                        + delimiter
+                        + (quarter == 0 ? "" : "Q" + quarter)
+        );
+        writer.newLine();
+      }
+    }
+  }
 }
