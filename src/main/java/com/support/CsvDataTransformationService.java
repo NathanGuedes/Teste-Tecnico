@@ -289,7 +289,7 @@ public class CsvDataTransformationService {
   }
 
   public void extractColumns(Path inputFile, List<String> columnsToKeep, String delimiter)
-          throws IOException {
+      throws IOException {
 
     // Lê o índice do cabeçalho
     Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
@@ -302,23 +302,22 @@ public class CsvDataTransformationService {
     }
 
     // Diretório de saída
-    Path outputDir = Paths.get(System.getProperty("user.dir"), "projected_files");
+    Path outputDir = Paths.get(System.getProperty("user.dir"), "output");
     Files.createDirectories(outputDir);
 
     // Arquivo de saída (mesmo nome do original)
-    Path outputFile = outputDir.resolve(inputFile.getFileName());
+    Path outputFile = outputDir.resolve("consolidado_despesas.csv");
 
     // Índices das colunas que serão extraídas
-    List<Integer> columnIndexes =
-            columnsToKeep.stream().map(headerIndex::get).toList();
+    List<Integer> columnIndexes = columnsToKeep.stream().map(headerIndex::get).toList();
 
     try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
-         BufferedWriter writer =
-                 Files.newBufferedWriter(
-                         outputFile,
-                         StandardCharsets.UTF_8,
-                         StandardOpenOption.CREATE,
-                         StandardOpenOption.TRUNCATE_EXISTING)) {
+        BufferedWriter writer =
+            Files.newBufferedWriter(
+                outputFile,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING)) {
 
       // Escreve o novo cabeçalho
       writer.write(String.join(delimiter, columnsToKeep));
@@ -347,7 +346,6 @@ public class CsvDataTransformationService {
       }
     }
   }
-
 
   // Converte um valor do CSV para double de forma segura
   private double parseNumber(String[] values, int index) {
@@ -381,28 +379,26 @@ public class CsvDataTransformationService {
     return baseDir;
   }
 
-  public void addYearAndQuarterColumns(
-          Path inputFile,
-          String dateColumnName,
-          String delimiter
-  ) throws IOException {
+  public void addYearAndQuarterColumns(Path inputFile, String dateColumnName, String delimiter)
+      throws IOException {
 
     Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
 
     Integer dateIndex = headerIndex.get(dateColumnName);
     if (dateIndex == null) {
       throw new IllegalArgumentException(
-              "Coluna de data '" + dateColumnName + "' não encontrada no CSV");
+          "Coluna de data '" + dateColumnName + "' não encontrada no CSV");
     }
 
     Path outputFile = calculetedFilesDir.resolve("new_" + inputFile.getFileName());
 
     try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
-         BufferedWriter writer = Files.newBufferedWriter(
-                 outputFile,
-                 StandardCharsets.UTF_8,
-                 StandardOpenOption.CREATE,
-                 StandardOpenOption.TRUNCATE_EXISTING)) {
+        BufferedWriter writer =
+            Files.newBufferedWriter(
+                outputFile,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING)) {
 
       // Cabeçalho original
       String headerLine = reader.readLine();
@@ -419,9 +415,8 @@ public class CsvDataTransformationService {
 
         String[] values = line.split(delimiter, -1);
 
-        String rawDate = dateIndex < values.length
-                ? values[dateIndex].replace("\"", "").trim()
-                : "";
+        String rawDate =
+            dateIndex < values.length ? values[dateIndex].replace("\"", "").trim() : "";
 
         int year = 0;
         int quarter = 0;
@@ -437,13 +432,7 @@ public class CsvDataTransformationService {
           quarter = ((month - 1) / 3) + 1;
         }
 
-        writer.write(
-                line
-                        + delimiter
-                        + year
-                        + delimiter
-                        + (quarter == 0 ? "" : "Q" + quarter)
-        );
+        writer.write(line + delimiter + year + delimiter + (quarter == 0 ? "" : "Q" + quarter));
         writer.newLine();
       }
     }
