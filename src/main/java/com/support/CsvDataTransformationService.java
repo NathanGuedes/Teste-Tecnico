@@ -5,29 +5,23 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 public class CsvDataTransformationService {
 
-  // Diretório onde serão salvos os arquivos com validação por regex
   private final Path validatedFilesDir;
-
-  // Diretório onde serão salvos os arquivos mesclados
   private final Path mergedFilesDir;
-
-  // Diretório onde serão salvos os arquivos com colunas calculadas
-  private final Path calculetedFilesDir;
+  private final Path calculatedFilesDir;
 
   public CsvDataTransformationService() throws IOException {
     this.validatedFilesDir = createDirectory("validated_files");
     this.mergedFilesDir = createDirectory("merged_files");
-    this.calculetedFilesDir = createDirectory("calculated_files");
+    this.calculatedFilesDir = createDirectory("calculated_files");
   }
 
   public Path getValidatedFilesDir() {
@@ -38,49 +32,42 @@ public class CsvDataTransformationService {
     return mergedFilesDir;
   }
 
-  public Path getCalculetedFilesDir() {
-    return calculetedFilesDir;
+  public Path getCalculatedFilesDir() {
+    return calculatedFilesDir;
   }
 
-  // Lê o cabeçalho do CSV e retorna um mapa com o nome da coluna e seu índice
   private static Map<String, Integer> readCsvHeaderIndex(Path csvFile, String delimiter)
       throws IOException {
 
-    try (Stream<String> lines = Files.lines(csvFile, StandardCharsets.UTF_8)) {
+    try (BufferedReader reader = Files.newBufferedReader(csvFile, StandardCharsets.UTF_8)) {
 
-      String header =
-          lines.findFirst().orElseThrow(() -> new IllegalArgumentException("Arquivo CSV vazio"));
-
-      String[] columns = header.split(delimiter);
-
-      Map<String, Integer> headerIndex = new LinkedHashMap<>();
-
-      for (int i = 0; i < columns.length; i++) {
-        String column = columns[i].replace("\"", "").trim();
-        headerIndex.put(column, i);
+      String header = reader.readLine();
+      if (header == null) {
+        throw new IllegalArgumentException("Arquivo CSV vazio");
       }
 
-      return headerIndex;
+      String[] columns = header.split(delimiter);
+      Map<String, Integer> index = new LinkedHashMap<>();
+
+      for (int i = 0; i < columns.length; i++) {
+        index.put(columns[i].replace("\"", "").trim(), i);
+      }
+
+      return index;
     }
   }
 
-  // Valida uma coluna usando regex e adiciona uma coluna indicando se o valor é válido
   public void validateColumnByRegex(
       Path inputFile, String columnName, String regex, String delimiter) throws IOException {
 
-    // Obtém o índice das colunas do CSV
     Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
-
-    // Verifica se a coluna existe
     Integer columnIndex = headerIndex.get(columnName);
+
     if (columnIndex == null) {
-      throw new IllegalArgumentException("Coluna '" + columnName + "' não encontrada no CSV");
+      throw new IllegalArgumentException("Coluna '" + columnName + "' não encontrada");
     }
 
-    // Compila o regex informado
     Pattern pattern = Pattern.compile(regex);
-
-    // Define o arquivo de saída com prefixo validated_
     Path outputFile = validatedFilesDir.resolve(inputFile.getFileName());
 
     try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
@@ -91,58 +78,44 @@ public class CsvDataTransformationService {
                 StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING)) {
 
-      // Lê o cabeçalho original
-      String headerLine = reader.readLine();
-
-      // Escreve o cabeçalho original adicionando a nova coluna de validação
-      writer.write((headerLine + delimiter + columnName + "_VALIDO").toUpperCase());
+      String header = reader.readLine();
+      writer.write((header + delimiter + columnName + "_VALIDO").toUpperCase());
       writer.newLine();
 
       String line;
-
-      // Processa cada linha do arquivo
       while ((line = reader.readLine()) != null) {
 
-        if (line.trim().isEmpty()) continue;
+        if (line.isBlank()) continue;
 
         String[] values = line.split(delimiter, -1);
+        String value =
+            columnIndex < values.length ? values[columnIndex].replace("\"", "").trim() : "";
 
-        String valueToValidate = columnIndex < values.length ? values[columnIndex] : "";
-
-        // Normaliza o valor antes da validação
-        valueToValidate = valueToValidate.replace("\"", "").trim();
-
-        boolean matches = pattern.matcher(valueToValidate).matches();
-
-        // Escreve a linha original adicionando 1 ou 0 conforme o resultado do regex
-        writer.write(line + delimiter + (matches ? "1" : "0"));
+        writer.write(line + delimiter + (pattern.matcher(value).matches() ? "1" : "0"));
         writer.newLine();
       }
     }
   }
 
-  // Cria uma nova coluna calculada a partir de duas colunas existentes
   public void calculateNewColumn(
       Path inputFile,
       String column1,
       String column2,
-      String newColumnName,
+      String newColumn,
       MathOperation operation,
       String delimiter)
       throws IOException {
 
-    // Obtém o índice das colunas do CSV
     Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
 
-    Integer index1 = headerIndex.get(column1);
-    Integer index2 = headerIndex.get(column2);
+    Integer idx1 = headerIndex.get(column1);
+    Integer idx2 = headerIndex.get(column2);
 
-    if (index1 == null || index2 == null) {
-      throw new IllegalArgumentException("Colunas informadas não existem no CSV");
+    if (idx1 == null || idx2 == null) {
+      throw new IllegalArgumentException("Colunas informadas não existem");
     }
 
-    // Define o arquivo de saída com prefixo calculated_
-    Path outputFile = calculetedFilesDir.resolve(inputFile.getFileName());
+    Path outputFile = calculatedFilesDir.resolve(inputFile.getFileName());
 
     try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
         BufferedWriter writer =
@@ -152,164 +125,129 @@ public class CsvDataTransformationService {
                 StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING)) {
 
-      // Lê o cabeçalho original
-      String headerLine = reader.readLine();
-
-      // Escreve o cabeçalho adicionando a nova coluna calculada
-      writer.write((headerLine + delimiter + newColumnName).toUpperCase());
+      String header = reader.readLine();
+      writer.write((header + delimiter + newColumn).toUpperCase());
       writer.newLine();
 
       String line;
-
-      // Processa cada linha do arquivo
       while ((line = reader.readLine()) != null) {
 
-        if (line.trim().isEmpty()) continue;
+        if (line.isBlank()) continue;
 
         String[] values = line.split(delimiter, -1);
 
-        double value1 = parseNumber(values, index1);
-        double value2 = parseNumber(values, index2);
+        double v1 = parseNumber(values, idx1);
+        double v2 = parseNumber(values, idx2);
 
-        double result = applyOperation(value1, value2, operation);
+        double result = applyOperation(v1, v2, operation);
+        String formatted = String.format("%.2f", result);
 
-        String resultFormatado = String.format("%.2f", result);
+        if (delimiter.equals(";")) {
+          formatted = formatted.replace(".", ",");
+        }
 
-        // Escreve a linha original adicionando o resultado da operação
-        writer.write(
-            line
-                + delimiter
-                + '"'
-                + (delimiter.equals(";") ? resultFormatado.replace(".", ",") : resultFormatado)
-                + '"');
+        writer.write(line + delimiter + "\"" + formatted + "\"");
         writer.newLine();
       }
     }
   }
 
-  // Mescla dois arquivos CSV utilizando uma chave comum
   public void mergeCsvByKey(
-      Path leftFile, Path rightFile, String leftKeyColumn, String rightKeyColumn, String delimiter)
+      Path leftFile, Path rightFile, String leftKey, String rightKey, String delimiter)
       throws IOException {
 
-    // Indexa o arquivo da direita usando a chave informada
-    Map<String, String[]> rightFileIndex = new HashMap<>();
-
+    Map<String, String[]> rightIndex = new HashMap<>();
     List<String> rightHeaders;
     int rightKeyIndex;
 
     try (BufferedReader reader = Files.newBufferedReader(rightFile, StandardCharsets.UTF_8)) {
 
-      String headerLine = reader.readLine();
-      if (headerLine == null) {
-        throw new IllegalArgumentException("Arquivo da direita está vazio");
-      }
-
+      String header = reader.readLine();
       rightHeaders =
-          Arrays.stream(headerLine.split(delimiter)).map(h -> h.replace("\"", "").trim()).toList();
+          Arrays.stream(header.split(delimiter)).map(h -> h.replace("\"", "").trim()).toList();
 
-      rightKeyIndex = rightHeaders.indexOf(rightKeyColumn);
+      rightKeyIndex = rightHeaders.indexOf(rightKey);
       if (rightKeyIndex == -1) {
-        throw new IllegalArgumentException(
-            "Chave '" + rightKeyColumn + "' não encontrada no arquivo da direita");
+        throw new IllegalArgumentException("Chave não encontrada no CSV da direita");
       }
 
       String line;
       while ((line = reader.readLine()) != null) {
         String[] values = line.split(delimiter, -1);
         if (rightKeyIndex < values.length) {
-          rightFileIndex.put(values[rightKeyIndex], values);
+          rightIndex.put(values[rightKeyIndex], values);
         }
       }
     }
 
-    String leftName = leftFile.getFileName().toString().replaceFirst("\\.csv$", "");
-    String rightName = rightFile.getFileName().toString().replaceFirst("\\.csv$", "");
-
-    Path outputFile = mergedFilesDir.resolve(leftName + "_" + rightName + ".csv");
+    Path output =
+        mergedFilesDir.resolve(
+            leftFile.getFileName().toString().replace(".csv", "")
+                + "_"
+                + rightFile.getFileName().toString());
 
     try (BufferedReader leftReader = Files.newBufferedReader(leftFile, StandardCharsets.UTF_8);
         BufferedWriter writer =
             Files.newBufferedWriter(
-                outputFile,
+                output,
                 StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING)) {
 
-      String leftHeaderLine = leftReader.readLine();
-      if (leftHeaderLine == null) {
-        throw new IllegalArgumentException("Arquivo da esquerda está vazio");
-      }
-
+      String leftHeader = leftReader.readLine();
       List<String> leftHeaders =
-          Arrays.stream(leftHeaderLine.split(delimiter))
-              .map(h -> h.replace("\"", "").trim())
-              .toList();
+          Arrays.stream(leftHeader.split(delimiter)).map(h -> h.replace("\"", "").trim()).toList();
 
-      int leftKeyIndex = leftHeaders.indexOf(leftKeyColumn);
+      int leftKeyIndex = leftHeaders.indexOf(leftKey);
       if (leftKeyIndex == -1) {
-        throw new IllegalArgumentException(
-            "Chave '" + leftKeyColumn + "' não encontrada no arquivo da esquerda");
+        throw new IllegalArgumentException("Chave não encontrada no CSV da esquerda");
       }
 
-      // Escreve o cabeçalho final com colunas dos dois arquivos
-      List<String> finalHeader = new ArrayList<>();
-      finalHeader.addAll(leftHeaders);
+      List<String> finalHeader = new ArrayList<>(leftHeaders);
       finalHeader.addAll(rightHeaders);
       finalHeader.add("OBSERVACAO");
 
       writer.write(String.join(delimiter, finalHeader));
       writer.newLine();
 
-      // Processa cada linha do arquivo da esquerda
-      String leftLine;
-      while ((leftLine = leftReader.readLine()) != null) {
+      String line;
+      while ((line = leftReader.readLine()) != null) {
 
-        String[] leftValues = leftLine.split(delimiter, -1);
-        String leftKeyValue = leftKeyIndex < leftValues.length ? leftValues[leftKeyIndex] : null;
+        String[] leftValues = line.split(delimiter, -1);
+        String key = leftKeyIndex < leftValues.length ? leftValues[leftKeyIndex] : null;
 
-        String[] rightValues = rightFileIndex.get(leftKeyValue);
-
-        List<String> mergedLine = new ArrayList<>(Arrays.asList(leftValues));
+        String[] rightValues = rightIndex.get(key);
+        List<String> merged = new ArrayList<>(Arrays.asList(leftValues));
 
         if (rightValues != null) {
-          mergedLine.addAll(Arrays.asList(rightValues));
-          mergedLine.add("");
+          merged.addAll(Arrays.asList(rightValues));
+          merged.add("");
         } else {
-          for (int i = 0; i < rightHeaders.size(); i++) {
-            mergedLine.add("null");
-          }
-          mergedLine.add("DADOS_NAO_ENCONTRADOS");
+          merged.addAll(Collections.nCopies(rightHeaders.size(), ""));
+          merged.add("DADOS_NAO_ENCONTRADOS");
         }
 
-        writer.write(String.join(delimiter, mergedLine));
+        writer.write(String.join(delimiter, merged));
         writer.newLine();
       }
     }
   }
 
-  public void extractColumns(Path inputFile, List<String> columnsToKeep, String delimiter)
+  public void extractColumns(Path inputFile, List<String> columns, String delimiter)
       throws IOException {
 
-    // Lê o índice do cabeçalho
     Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
 
-    // Valida se todas as colunas existem
-    for (String column : columnsToKeep) {
-      if (!headerIndex.containsKey(column)) {
-        throw new IllegalArgumentException("Coluna '" + column + "' não encontrada no CSV");
+    for (String col : columns) {
+      if (!headerIndex.containsKey(col)) {
+        throw new IllegalArgumentException("Coluna '" + col + "' não encontrada");
       }
     }
 
-    // Diretório de saída
-    Path outputDir = Paths.get(System.getProperty("user.dir"), "output");
-    Files.createDirectories(outputDir);
+    Path outputFile =
+        Paths.get(System.getProperty("user.dir"), "output", "consolidado_despesas.csv");
 
-    // Arquivo de saída (mesmo nome do original)
-    Path outputFile = outputDir.resolve("consolidado_despesas.csv");
-
-    // Índices das colunas que serão extraídas
-    List<Integer> columnIndexes = columnsToKeep.stream().map(headerIndex::get).toList();
+    Files.createDirectories(outputFile.getParent());
 
     try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
         BufferedWriter writer =
@@ -319,40 +257,121 @@ public class CsvDataTransformationService {
                 StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING)) {
 
-      // Escreve o novo cabeçalho
-      writer.write(String.join(delimiter, columnsToKeep));
+      writer.write(String.join(delimiter, columns));
       writer.newLine();
 
-      // DESCARTA o cabeçalho original do CSV
-      reader.readLine();
+      reader.readLine(); // descarta header
 
       String line;
-
-      // Processa apenas as linhas de dados
       while ((line = reader.readLine()) != null) {
 
-        if (line.trim().isEmpty()) continue;
-
         String[] values = line.split(delimiter, -1);
+        List<String> out = new ArrayList<>();
 
-        List<String> projectedValues = new ArrayList<>();
-
-        for (int index : columnIndexes) {
-          projectedValues.add(index < values.length ? values[index] : "");
+        for (String col : columns) {
+          int idx = headerIndex.get(col);
+          out.add(idx < values.length ? values[idx] : "");
         }
 
-        writer.write(String.join(delimiter, projectedValues));
+        writer.write(String.join(delimiter, out));
         writer.newLine();
       }
     }
   }
 
-  // Converte um valor do CSV para double de forma segura
+  public void addYearAndQuarterColumns(Path inputFile, String dateColumn, String delimiter)
+      throws IOException {
+
+    Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
+    Integer dateIndex = headerIndex.get(dateColumn);
+
+    if (dateIndex == null) {
+      throw new IllegalArgumentException("Coluna de data não encontrada");
+    }
+
+    Path output = calculatedFilesDir.resolve("new_" + inputFile.getFileName());
+
+    try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
+        BufferedWriter writer =
+            Files.newBufferedWriter(
+                output,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING)) {
+
+      String header = reader.readLine();
+      writer.write((header + delimiter + "ANO" + delimiter + "TRIMESTRE").toUpperCase());
+      writer.newLine();
+
+      String line;
+      while ((line = reader.readLine()) != null) {
+
+        String[] values = line.split(delimiter, -1);
+        String raw = dateIndex < values.length ? values[dateIndex].replace("\"", "").trim() : "";
+
+        int year = 0;
+        String quarter = "";
+
+        if (raw.matches("\\d{4}-\\d{2}-\\d{2}")) {
+          int month = Integer.parseInt(raw.substring(5, 7));
+          year = Integer.parseInt(raw.substring(0, 4));
+          quarter = "Q" + (((month - 1) / 3) + 1);
+        }
+
+        writer.write(line + delimiter + year + delimiter + quarter);
+        writer.newLine();
+      }
+    }
+  }
+
+  public Path zipPathKeepingName(Path source) throws IOException {
+
+    if (!Files.exists(source)) {
+      throw new IllegalArgumentException("Caminho não existe: " + source);
+    }
+
+    Path zipPath = source.getParent().resolve(source.getFileName().toString() + ".zip");
+
+    try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(zipPath))) {
+
+      if (Files.isDirectory(source)) {
+
+        try (Stream<Path> paths = Files.walk(source)) {
+          paths
+              .filter(Files::isRegularFile)
+              .forEach(
+                  path -> {
+                    try {
+                      ZipEntry entry = new ZipEntry(source.relativize(path).toString());
+                      zos.putNextEntry(entry);
+                      Files.copy(path, zos);
+                      zos.closeEntry();
+                    } catch (IOException e) {
+                      throw new RuntimeException(e);
+                    }
+                  });
+        }
+
+      } else {
+        zos.putNextEntry(new ZipEntry(source.getFileName().toString()));
+        Files.copy(source, zos);
+        zos.closeEntry();
+      }
+    }
+
+    return zipPath;
+  }
+
+  private static Path createDirectory(String name) throws IOException {
+    Path dir = Paths.get(System.getProperty("user.dir"), name);
+    Files.createDirectories(dir);
+    return dir;
+  }
+
   private double parseNumber(String[] values, int index) {
     if (index >= values.length) return 0.0;
 
     String raw = values[index].replace("\"", "").replace(",", ".").trim();
-
     if (raw.isEmpty()) return 0.0;
 
     try {
@@ -362,79 +381,12 @@ public class CsvDataTransformationService {
     }
   }
 
-  // Aplica a operação matemática informada
-  private double applyOperation(double v1, double v2, MathOperation operation) {
-    return switch (operation) {
-      case ADD -> v1 + v2;
-      case SUBTRACT -> v1 - v2;
-      case MULTIPLY -> v1 * v2;
-      case DIVIDE -> v2 == 0 ? 0.0 : v1 / v2;
+  private double applyOperation(double a, double b, MathOperation op) {
+    return switch (op) {
+      case ADD -> a + b;
+      case SUBTRACT -> a - b;
+      case MULTIPLY -> a * b;
+      case DIVIDE -> b == 0 ? 0.0 : a / b;
     };
-  }
-
-  // Cria um diretório na raiz do projeto caso não exista
-  private static Path createDirectory(String folderName) throws IOException {
-    Path baseDir = Paths.get(System.getProperty("user.dir"), folderName);
-    Files.createDirectories(baseDir);
-    return baseDir;
-  }
-
-  public void addYearAndQuarterColumns(Path inputFile, String dateColumnName, String delimiter)
-      throws IOException {
-
-    Map<String, Integer> headerIndex = readCsvHeaderIndex(inputFile, delimiter);
-
-    Integer dateIndex = headerIndex.get(dateColumnName);
-    if (dateIndex == null) {
-      throw new IllegalArgumentException(
-          "Coluna de data '" + dateColumnName + "' não encontrada no CSV");
-    }
-
-    Path outputFile = calculetedFilesDir.resolve("new_" + inputFile.getFileName());
-
-    try (BufferedReader reader = Files.newBufferedReader(inputFile, StandardCharsets.UTF_8);
-        BufferedWriter writer =
-            Files.newBufferedWriter(
-                outputFile,
-                StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING)) {
-
-      // Cabeçalho original
-      String headerLine = reader.readLine();
-
-      // Novo cabeçalho
-      writer.write((headerLine + delimiter + "ANO" + delimiter + "TRIMESTRE").toUpperCase());
-      writer.newLine();
-
-      String line;
-
-      while ((line = reader.readLine()) != null) {
-
-        if (line.trim().isEmpty()) continue;
-
-        String[] values = line.split(delimiter, -1);
-
-        String rawDate =
-            dateIndex < values.length ? values[dateIndex].replace("\"", "").trim() : "";
-
-        int year = 0;
-        int quarter = 0;
-
-        // Validação básica do formato yyyy-mm-dd
-        if (rawDate.matches("\\d{4}-\\d{2}-\\d{2}")) {
-
-          String[] dateParts = rawDate.split("-");
-
-          year = Integer.parseInt(dateParts[0]);
-          int month = Integer.parseInt(dateParts[1]);
-
-          quarter = ((month - 1) / 3) + 1;
-        }
-
-        writer.write(line + delimiter + year + delimiter + (quarter == 0 ? "" : "Q" + quarter));
-        writer.newLine();
-      }
-    }
   }
 }
