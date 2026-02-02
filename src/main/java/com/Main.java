@@ -67,6 +67,17 @@ public class Main {
             MathOperation.SUBTRACT) // calcula saldo final
         .addYearAndQuarterColumns("DATA") // adiciona colunas de ano e trimestre
         .mergeByKey(extraFile, "REG_ANS", "REGISTRO_OPERADORA") // mescla informações adicionais
+        .save(transformedOutput);
+
+    // Valida e filtra CSV final
+    new CsvValidator(transformedDir.resolve("dados.csv"), ";")
+        .filterRowsByNumericValue(
+            "VALOR_DESPESAS", 0, ComparisonOperators.LE) // remove despesas <= 0
+        .validateCnpj("CNPJ")
+        .validateRequiredField("RAZAO_SOCIAL")
+        .saveFormatted("consolidado_despesas.csv"); // salva no diretório output
+
+    new CsvTransformer(outputDir.resolve("consolidado_despesas.csv"), ";")
         .extractColumns(
             List.of(
                 "DATA",
@@ -80,15 +91,10 @@ public class Main {
                 "VALOR_DESPESAS",
                 "REG_ANS",
                 "MODALIDADE",
-                "UF")) // mantém apenas colunas necessárias
-        .save(transformedOutput);
-
-    // Valida e filtra CSV final
-    new CsvValidator(transformedDir.resolve("dados.csv"), ";")
-        .filterRowsByNumericValue(
-            "VALOR_DESPESAS", 0, ComparisonOperators.LE) // remove despesas <= 0
-        .validateCnpj("CNPJ") // valida CNPJs
-        .saveFormatted("consolidado_despesas.csv"); // salva no diretório output
+                "UF",
+                "CNPJ_VALIDO",
+                "OBSERVACAO"))
+        .save(outputDir.resolve("consolidado_despesas.csv"));
 
     // Compacta o CSV final
     Helpers.zipFiles(outputDir.resolve("consolidado_despesas.csv"));
