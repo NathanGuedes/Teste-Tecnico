@@ -18,15 +18,4 @@ Após a extração, os arquivos foram listados e lidos utilizando a API java.nio
 
 A decisão pelo método incremental foi tomada como medida preventiva, considerando que não há conhecimento prévio das dimensões dos arquivos nem da memória disponível
 Esta abordagem garante maior flexibilidade e segurança no processamento de arquivos de diferentes tamanhos evitando possível estouro de memória.
-
-## 1.3. Consolidação e Análise de Inconsistências & 2.2. Enriquecimento de Dados com Tratamento de Falhas
-
-Os arquivos CSV disponibilizados pela ANS continham apenas os campos DATA, REG_ANS, CD_CONTA_CONTABIL, DESCRICAO, VL_SALDO_INICIAL e VL_SALDO_FINAL. Informações como Ano, Trimestre, CNPJ, Razão Social, UF e Modalidade não estavam presentes no arquivo original por esse motivos descidi adiantar na etapa 2.2 para enrriquecer esses dados.
-
-Por esse motivo, foi necessário gerar as colunas Ano e Trimestre a partir do campo DATA, que estava no formato yyyy-mm-dd. Esse processamento foi realizado no método addYearAndQuarterColumns, e registros com datas inválidas ou ausentes não tiveram essas informações calculadas.
-
-Durante a consolidação dos três trimestres, foram encontrados valores zerados ou negativos e registros com inconsistências cadastrais. Esses dados não foram removidos nem corrigidos automaticamente, sendo mantidos para garantir fidelidade ao dado original. A consolidação e preservação dos registros ocorre durante o fluxo de processamento dos arquivos e na geração das colunas calculadas, especialmente no método calculateNewColumn.
-
-No enriquecimento cadastral, o relacionamento entre os dados financeiros e cadastrais foi feito utilizando o CNPJ como chave, por meio do método mergeCsvByKey. Registros sem correspondência no cadastro da ANS foram mantidos com campos vazios. Quando um mesmo CNPJ apareceu mais de uma vez no cadastro com informações diferentes, foi considerada a última ocorrência processada durante o merge.
-
-Essas decisões visam manter o processo simples, transparente e alinhado aos dados realmente disponíveis na fonte oficial, evitando inferências ou correções que poderiam distorcer a informação original.
+ências ou correções que poderiam distorcer a informação original.
