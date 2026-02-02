@@ -40,11 +40,5 @@ build/
 
 compress
 extract
-filtered_files
-projected_files
-pre_processed_files
-calculated_files
-merged_files
-validated_files
 output
 .idea

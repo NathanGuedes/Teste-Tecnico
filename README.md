@@ -19,3 +19,4 @@ Após a extração, os arquivos foram listados e lidos utilizando a API java.nio
 A decisão pelo método incremental foi tomada como medida preventiva, considerando que não há conhecimento prévio das dimensões dos arquivos nem da memória disponível
 Esta abordagem garante maior flexibilidade e segurança no processamento de arquivos de diferentes tamanhos evitando possível estouro de memória.
 ências ou correções que poderiam distorcer a informação original.
+
